@@ -1,6 +1,7 @@
 /// <reference path="ConfigTypes.ts" />
 
 const SHEET_NAMES = {
+  DOKUMENTATION: 'Dokumentation',
   SPIELER: 'Spieler',
   ABWESENHEITEN: 'Abwesenheiten',
   SPIELTERMINE: 'Spieltermine',
@@ -10,6 +11,15 @@ const SHEET_NAMES = {
 
 const HEADER_COLOR = '#4A90D9';
 const HEADER_FONT_COLOR = '#FFFFFF';
+
+function deleteAllSheets(): void {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheets = ss.getSheets();
+  for (const sheet of sheets) {
+    ss.deleteSheet(sheet);
+  }
+  SpreadsheetApp.flush();
+}
 
 function getOrCreateSheet(name: string): GoogleAppsScript.Spreadsheet.Sheet {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -26,6 +36,78 @@ function formatHeader(sheet: GoogleAppsScript.Spreadsheet.Sheet, numCols: number
   range.setBackground(HEADER_COLOR);
   range.setFontColor(HEADER_FONT_COLOR);
   range.setHorizontalAlignment('center');
+}
+
+function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript.Spreadsheet.Sheet {
+  const sheet = getOrCreateSheet(SHEET_NAMES.DOKUMENTATION);
+
+  sheet.setColumnWidth(1, 380);
+  sheet.setColumnWidth(2, 480);
+  sheet.setColumnWidth(3, 480);
+
+  const rows: string[][] = [
+    ['EINSATZPLANER – DOKUMENTATION', '', ''],
+    [`${einstellungen.teamName} – Saison ${einstellungen.saison}`, '', ''],
+    ['', '', ''],
+    ['SHEETS IM ÜBERBLICK', '', ''],
+    ['Spieler', 'Stammdaten aller Teammitglieder', 'Name, Email (optional), Rang (1 = stärkster), Aktiv, Änderungen melden, Rolle'],
+    ['Abwesenheiten', 'Von den Spielern selbst gepflegt', 'Spieler (Dropdown), Von, Bis, Kommentar'],
+    ['Spieltermine', 'Vom Kapitän erfasst', 'Datum, Heim/Gast, Gegner, Ort (optional), Status'],
+    ['Aufstellungen', 'Autom. generiert, manuell anpassbar', 'Termin, Typ (Einzel 1-4 / Doppel), Spieler'],
+    ['Änderungslog', 'Automatisch, versteckt', 'Protokoll aller Änderungen durch Teammitglieder'],
+    ['', '', ''],
+    ['SPALTEN-ERKLÄRUNG: SPIELER', '', ''],
+    ['Name', 'Vor- und Nachname', 'Wird in allen Dropdowns verwendet'],
+    ['Email', 'Optional – Google-Mail-Adresse', 'Fehlt sie, wird der Kapitän nach dem E-Mail-Versand informiert'],
+    ['Rang', '1 = stärkster Spieler, 2 = zweitstärkster usw.', 'Bestimmt die Position in der automatischen Aufstellung'],
+    ['Aktiv', 'Checkbox', 'Nur aktive Spieler werden bei der Aufstellungs-Generierung berücksichtigt. Inaktive Spieler (kein Haken) tauchen in keiner Aufstellung auf.'],
+    ['Änderungen melden', 'Checkbox', 'Wer hier einen Haken setzt, bekommt nach Sheet-Änderungen durch andere eine E-Mail mit den letzten Änderungen'],
+    ['Rolle', 'Dropdown: "Kapitän" oder leer', 'Nur der Kapitän bekommt nach dem E-Mail-Versand einen Hinweis über eingesetzte Spieler ohne E-Mail-Adresse'],
+    ['', '', ''],
+    ['SPALTEN-ERKLÄRUNG: ABWESENHEITEN', '', ''],
+    ['Spieler', 'Dropdown aus Spieler-Liste', 'Von wem die Abwesenheit gemeldet wird'],
+    ['Abwesenheit von / bis', 'Datum im Format TT.MM.JJJJ', 'Erster und letzter Tag der Abwesenheit'],
+    ['Kommentar', 'Freitext', 'Hinweise wie "nur wenn es sein muss" werden gelb markiert – Spieler wird dann trotzdem bei Aufstellung berücksichtigt'],
+    ['', '', ''],
+    ['SPALTEN-ERKLÄRUNG: SPIELTERMINE', '', ''],
+    ['Datum', 'Datum im Format TT.MM.JJJJ', 'Tag des Spiels'],
+    ['Heim / Gast', 'Dropdown: Heim oder Gast', ''],
+    ['Gegner', 'Name des gegnerischen Teams', ''],
+    ['Ort', 'Optional – Adresse der Spielstätte', ''],
+    ['Status', 'Dropdown: Geplant / Finalisiert / Versendet', 'Grün = Geplant, Gelb = Finalisiert, Lila = Versendet'],
+    ['', '', ''],
+    ['SPALTEN-ERKLÄRUNG: AUFSTELLUNGEN', '', ''],
+    ['Termin', 'Dropdown aus Spieltermine', 'Für welches Spiel die Aufstellung gilt'],
+    ['Typ', 'Dropdown: Einzel 1-4 oder Doppel', '4 Einzel + 2 Doppel pro Termin. Doppel-Paare legt der Kapitän vor Ort fest.'],
+    ['Spieler', 'Dropdown aus Spieler-Liste', 'Wer auf dieser Position spielt'],
+    ['', '', ''],
+    ['MENÜ "EINSATZPLANER"', '', ''],
+    ['Sheet neu aufbauen', '', 'Löscht ALLE Daten und baut die Sheets aus der Konfiguration neu auf. Vorher Daten exportieren!'],
+    ['Daten exportieren', '', 'Sichert alle Sheet-Daten als JSON-Datei auf Google Drive (Ordner "Einsatzplaner Exports")'],
+    ['Aufstellungen generieren', '', 'Ermittelt verfügbare Spieler (aktiv + nicht abwesend) und weist sie nach Rang den Positionen zu'],
+    ['Aufstellungen finalisieren', '', 'Setzt den Status aller geplanten Spieltermine auf "Finalisiert"'],
+    ['Emails senden', '', 'Sendet jedem eingesetzten Spieler seinen Einsatzplan per E-Mail. Spieler ohne E-Mail werden dem Kapitän gemeldet.'],
+    ['', '', ''],
+    ['BENACHRICHTIGUNGEN (AUTOMATISCH)', '', ''],
+    ['Änderungslog', '', 'Jede Bearbeitung an Spieler-, Abwesenheiten- oder Spieltermine-Sheet wird protokolliert'],
+    ['Änderungs-Mail', '', 'Nach 5 Minuten ohne weitere Änderung erhalten alle mit Haken bei "Änderungen melden" eine E-Mail – außer dem Bearbeiter selbst'],
+    ['Aufstellungs-Mail', '', 'Über das Menü manuell ausgelöst. Jeder eingesetzte Spieler mit E-Mail bekommt seinen Plan.'],
+    ['Kapitän-Hinweis', '', 'Spieler ohne E-Mail werden dem Kapitän nach dem E-Mail-Versand gemeldet.'],
+  ];
+
+  const numCols = 3;
+  sheet.getRange(1, 1, rows.length, numCols).setValues(rows);
+
+  sheet.getRange(1, 1, 2, numCols).setFontWeight('bold').setFontSize(14).setBackground('#E8F0FE');
+  sheet.getRange(4, 1, 1, numCols).setFontWeight('bold').setFontSize(12).setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
+  sheet.getRange(6, 1, 1, numCols).setFontWeight('bold').setBackground('#E8F0FE');
+  sheet.getRange(13, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
+  sheet.getRange(21, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
+  sheet.getRange(30, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
+  sheet.getRange(37, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
+
+  sheet.setFrozenRows(0);
+  return sheet;
 }
 
 function buildSpielerSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.Sheet {
@@ -289,6 +371,9 @@ function pad(n: number): string {
 }
 
 function buildAllSheets(config: SheetConfig): void {
+  deleteAllSheets();
+
+  buildDokumentationSheet(config.einstellungen);
   buildSpielerSheet(config);
   buildSpieltermineSheet(config);
   buildAbwesenheitenSheet(config);
@@ -296,5 +381,5 @@ function buildAllSheets(config: SheetConfig): void {
   buildAenderungslogSheet();
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.setActiveSheet(ss.getSheetByName(SHEET_NAMES.SPIELER)!);
+  ss.setActiveSheet(ss.getSheetByName(SHEET_NAMES.DOKUMENTATION)!);
 }

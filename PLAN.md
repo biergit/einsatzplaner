@@ -115,7 +115,7 @@ enum COL_AENDERUNGSLOG { Zeitstempel = 1, Bereich = 2, AlterWert = 3, NeuerWert 
 |-------|--------------|
 | `src/ConfigTypes.ts` | Interfaces + Spalten-Enums |
 | `src/Config.ts` | SHEET_CONFIG mit leeren Defaults (getrackt) |
-| `src/SheetBuilder.ts` | Programmatische Erstellung aller 5 Sheets |
+| `src/SheetBuilder.ts` | Löscht alle Sheets und baut 6 Sheets neu auf (inkl. Dokumentation) |
 | `src/ChangeTracker.ts` | onEdit-Trigger, Debounce-Timer, Änderungs-Benachrichtigung |
 | `src/DataExporter.ts` | Export aller Sheet-Daten nach Google Drive |
 | `src/AufstellungsGenerator.ts` | Automatische Aufstellungsberechnung |

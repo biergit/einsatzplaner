@@ -17,11 +17,11 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
   const sheet = range.getSheet();
   const sheetName = sheet.getName();
 
-  if (sheetName === SHEET_NAMES.AENDERUNGSLOG) {
-    return;
-  }
-
-  if (sheetName === SHEET_NAMES.AUFSTELLUNGEN) {
+  if (
+    sheetName === SHEET_NAMES.AENDERUNGSLOG ||
+    sheetName === SHEET_NAMES.AUFSTELLUNGEN ||
+    sheetName === SHEET_NAMES.DOKUMENTATION
+  ) {
     return;
   }
 

@@ -93,6 +93,7 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 
 | Sheet | Zweck |
 |-------|-------|
+| **Dokumentation** | Erläuterung aller Spalten, Funktionen und des Workflows |
 | **Spieler** | Name, Email (optional), Rang, Aktiv, Änderungen melden, Rolle |
 | **Abwesenheiten** | Spieler, Von, Bis, Kommentar |
 | **Spieltermine** | Datum, Heim/Gast, Gegner, Ort (optional), Status |
