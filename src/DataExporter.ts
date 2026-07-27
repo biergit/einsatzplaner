@@ -9,11 +9,7 @@ function exportAllData(): ExportResult {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const exportData: Record<string, unknown[][]> = {};
 
-  const sheetNames = [
-    SHEET_NAMES.SPIELER,
-    SHEET_NAMES.ABWESENHEITEN,
-    SHEET_NAMES.SAISON,
-  ];
+  const sheetNames = [SHEET_NAMES.SPIELER, SHEET_NAMES.ABWESENHEITEN, SHEET_NAMES.SAISON];
 
   for (const name of sheetNames) {
     const sheet = ss.getSheetByName(name);
@@ -21,8 +17,7 @@ function exportAllData(): ExportResult {
       const lastRow = sheet.getLastRow();
       const lastCol = sheet.getLastColumn();
       if (lastRow > 0) {
-        const range = sheet.getRange(1, 1, lastRow, lastCol);
-        exportData[name] = range.getValues();
+        exportData[name] = sheet.getRange(1, 1, lastRow, lastCol).getValues();
       }
     }
   }
@@ -42,19 +37,22 @@ function exportAllData(): ExportResult {
     file = folder.createFile(fileName, content, 'application/json');
   }
 
-  return {
-    fileId: file.getId(),
-    fileName: fileName,
-  };
+  return { fileId: file.getId(), fileName };
 }
 
 function getOrCreateExportFolder(): GoogleAppsScript.Drive.Folder {
-  const folderName = 'Einsatzplaner Exports';
-  const folders = DriveApp.getFoldersByName(folderName);
+  const props = PropertiesService.getScriptProperties();
+  const folderId = props.getProperty('EXPORT_FOLDER_ID');
 
-  if (folders.hasNext()) {
-    return folders.next();
+  if (folderId) {
+    try {
+      return DriveApp.getFolderById(folderId);
+    } catch (_e) {
+      props.deleteProperty('EXPORT_FOLDER_ID');
+    }
   }
 
-  return DriveApp.createFolder(folderName);
+  const folder = DriveApp.createFolder('Einsatzplaner Exports');
+  props.setProperty('EXPORT_FOLDER_ID', folder.getId());
+  return folder;
 }

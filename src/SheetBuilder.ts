@@ -10,7 +10,6 @@ const SHEET_NAMES = {
 
 const HEADER_COLOR = '#4A90D9';
 const HEADER_FONT_COLOR = '#FFFFFF';
-const NON_TOP4_BG = '#FFF9E6';
 
 function getOrCreateSheet(name: string): GoogleAppsScript.Spreadsheet.Sheet {
   const ss = SpreadsheetApp.getActiveSpreadsheet();

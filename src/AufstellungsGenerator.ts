@@ -155,16 +155,19 @@ function validateAllRowsFast(
   const numPlayers = aktiveSpieler.length;
   const numRows = dates.length;
 
-  const hinweisRange = sheet.getRange(2, saisonHinweisCol(), numRows, 1);
-  const hinweisValues: string[][] = [];
-  const statusRange = sheet.getRange(2, saisonStatusCol(), numRows, 1);
-  const statusValues = statusRange.getValues() as string[][];
-
+  const gegnerData = sheet.getRange(2, saisonGegnerCol(), numRows, 1).getValues() as string[][];
   const playerCols = sheet.getRange(2, saisonSpielerCol(0), numRows, numPlayers).getValues() as string[][];
 
+  const hinweisValues: string[][] = [];
   const NON_TOP4_BG = '#FFF9E6';
 
   for (let r = 0; r < numRows; r++) {
+    const gegner = String(gegnerData[r][0] || '').trim();
+    if (!gegner) {
+      hinweisValues.push(['']);
+      continue;
+    }
+
     const key = dateKey(dates[r]);
     const dayMap = allAbw.get(key);
 
@@ -182,9 +185,7 @@ function validateAllRowsFast(
 
       const name = aktiveSpieler[pi].name;
       const abwDisplay = dayMap?.get(name);
-      if (abwDisplay) {
-        warnungen.push(`${name}: ${abwDisplay}`);
-      }
+      if (abwDisplay) warnungen.push(`${name}: ${abwDisplay}`);
     }
 
     let ersatz = 0;
@@ -202,9 +203,8 @@ function validateAllRowsFast(
     hinweisValues.push([warnungen.join(' | ')]);
   }
 
-  hinweisRange.setValues(hinweisValues);
+  sheet.getRange(2, saisonHinweisCol(), numRows, 1).setValues(hinweisValues);
 
-  const gegnerData = sheet.getRange(2, saisonGegnerCol(), numRows, 1).getValues() as string[][];
   for (let r = 0; r < numRows; r++) {
     const gegner = String(gegnerData[r][0] || '').trim();
     if (!gegner) continue;
@@ -229,8 +229,7 @@ function validateAllRowsFast(
       bgColors.push(notTop4 ? NON_TOP4_BG : null);
     }
 
-    const bgRow = sheet.getRange(r + 2, saisonSpielerCol(0), 1, numPlayers);
-    bgRow.setBackgrounds([bgColors]);
+    sheet.getRange(r + 2, saisonSpielerCol(0), 1, numPlayers).setBackgrounds([bgColors]);
   }
 }
 

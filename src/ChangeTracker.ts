@@ -20,6 +20,26 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
 
   if (sheetName === SHEET_NAMES.AENDERUNGSLOG || sheetName === SHEET_NAMES.DOKUMENTATION) return;
 
+  const row = range.getRow();
+  const col = range.getColumn();
+
+  if (sheetName === SHEET_NAMES.SAISON && row >= 2) {
+    if (col === saisonGegnerCol()) {
+      const newValue = e.value !== undefined ? String(e.value) : '';
+      const statusCell = sheet.getRange(row, saisonStatusCol());
+      if (newValue.trim()) {
+        if (!String(statusCell.getValue() || '').trim()) statusCell.setValue('Geplant');
+      } else {
+        statusCell.setValue('');
+      }
+    }
+    validateAndUpdateSaisonRow(range);
+  }
+
+  if (sheetName === SHEET_NAMES.ABWESENHEITEN && row >= 2) {
+    updateSaisonForAbsenceChange(range);
+  }
+
   const oldValue = e.oldValue !== undefined ? String(e.oldValue) : '';
   const newValue = e.value !== undefined ? String(e.value) : '';
 
@@ -32,26 +52,6 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
   });
 
   resetDebounceTimer();
-
-  if (sheetName === SHEET_NAMES.ABWESENHEITEN && range.getRow() >= 2) {
-    updateSaisonForAbsenceChange(range);
-  }
-
-  if (sheetName === SHEET_NAMES.SAISON && range.getRow() >= 2) {
-    validateAndUpdateSaisonRow(range);
-    ensureGeplantStatus(range);
-  }
-}
-
-function ensureGeplantStatus(editedRange: GoogleAppsScript.Spreadsheet.Range): void {
-  const editedCol = editedRange.getColumn();
-  if (editedCol !== saisonGegnerCol()) return;
-  const row = editedRange.getRow();
-  const sheet = editedRange.getSheet();
-  const statusCell = sheet.getRange(row, saisonStatusCol());
-  if (!String(statusCell.getValue()).trim()) {
-    statusCell.setValue('Geplant');
-  }
 }
 
 function updateSaisonForAbsenceChange(editedRange: GoogleAppsScript.Spreadsheet.Range): void {
@@ -181,6 +181,12 @@ function validateAndUpdateSaisonRow(editedRange: GoogleAppsScript.Spreadsheet.Ra
   const row = editedRange.getRow();
   const sheet = editedRange.getSheet();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const gegner = String(sheet.getRange(row, saisonGegnerCol()).getValue() || '').trim();
+  if (!gegner) {
+    sheet.getRange(row, saisonHinweisCol()).setValue('');
+    return;
+  }
 
   const datum = toDateSafe(sheet.getRange(row, saisonDatumCol()).getValue());
   if (!datum) return;
