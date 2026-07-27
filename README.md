@@ -49,6 +49,17 @@ npm run open               # Öffnet das aktuell aktive Sheet im Browser
 
 `deploy` und `deploy:test` kümmern sich automatisch um das Umschalten des Script-Kontexts. Kein manuelles Kopieren nötig.
 
+### 5. Berechtigungen erteilen
+
+Nach dem ersten Deploy öffnest du das Sheet und der Code ist da, aber das Menü fehlt noch. Einmalig:
+
+1. Im **Apps Script Editor** die Funktion `onOpen` aus dem Dropdown auswählen (oben mittig)
+2. Auf **"Ausführen"** (▶️) klicken
+3. Google fragt nach Berechtigungen → alles bestätigen
+4. Sheet im Browser neu laden (F5)
+
+Danach erscheint das Menü **Einsatzplaner** und alle Funktionen stehen bereit. Dieser Schritt ist nur einmal nötig – bei späteren `clasp push`-Deployments ist nichts weiter zu tun.
+
 ## Entwicklung
 
 ```
