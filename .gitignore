@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.clasp.json
+data/*
+!data/*.sample
+export/
+*.log
+.DS_Store

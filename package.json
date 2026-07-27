@@ -1,0 +1,27 @@
+{
+  "name": "einsatzplaner",
+  "version": "1.0.0",
+  "description": "Google Sheets Einsatzplaner für Tischtennis-Teams",
+  "private": true,
+  "scripts": {
+    "build": "tsc && cp appsscript.json dist/ && python3 build.py",
+    "build:test": "tsc && cp appsscript.json dist/ && python3 build.py --data-dir test",
+    "watch": "tsc --watch",
+    "push": "clasp push",
+    "deploy": "npm run build && clasp push",
+    "deploy:test": "npm run build:test && clasp push",
+    "login": "clasp login",
+    "create": "clasp create --type sheets --title 'TT Einsatzplaner DEV' --rootDir ./dist",
+    "create:test": "clasp create --type sheets --title 'TT Einsatzplaner TEST' --rootDir ./dist",
+    "open": "clasp open"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@google/clasp": "^3.3.0",
+    "@types/google-apps-script": "^2.0.11",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "teamName": "TT Team Musterstadt",
+  "saison": "2026/2027",
+  "spielformat": {
+    "einzel": 4,
+    "doppel": 2,
+    "system": "Bundessystem"
+  }
+}
