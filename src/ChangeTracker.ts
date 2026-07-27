@@ -39,6 +39,18 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
 
   if (sheetName === SHEET_NAMES.SAISON && range.getRow() >= 2) {
     validateAndUpdateSaisonRow(range);
+    ensureGeplantStatus(range);
+  }
+}
+
+function ensureGeplantStatus(editedRange: GoogleAppsScript.Spreadsheet.Range): void {
+  const editedCol = editedRange.getColumn();
+  if (editedCol !== saisonGegnerCol()) return;
+  const row = editedRange.getRow();
+  const sheet = editedRange.getSheet();
+  const statusCell = sheet.getRange(row, saisonStatusCol());
+  if (!String(statusCell.getValue()).trim()) {
+    statusCell.setValue('Geplant');
   }
 }
 

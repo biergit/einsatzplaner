@@ -115,6 +115,11 @@ function fillEinsatzartenFast(
     const gegner = String(sheet.getRange(row, saisonGegnerCol()).getValue() || '').trim();
     if (!gegner) continue;
 
+    const statusCell = sheet.getRange(row, saisonStatusCol());
+    if (!String(statusCell.getValue() || '').trim()) {
+      statusCell.setValue('Geplant');
+    }
+
     const key = dateKey(dates[r]);
     const dayMap = allAbw.get(key);
 
