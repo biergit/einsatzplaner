@@ -45,7 +45,6 @@ function sendEinsatzEmails(): void {
 
     const heimAuswaerts = String(saisonSheet.getRange(row, saisonHeimAuswaertsCol()).getValue() || '').trim();
     const datumStr = Utilities.formatDate(datum, 'Europe/Berlin', 'dd.MM.yyyy');
-    const z = startzeit ? ` – ${startzeit}` : '';
 
     const key = dateKey(datum);
     const dayMap = allAbw.get(key);
@@ -74,7 +73,7 @@ function sendEinsatzEmails(): void {
       einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: 'Einzel+Doppel', besondereUnterstuetzung: false });
     }
 
-    spielplanRows.push([datumStr, z ? z : '', heimAuswaerts, gegner, matchPlayers.join('<br>')]);
+    spielplanRows.push([datumStr, startzeit, heimAuswaerts, gegner, matchPlayers.join('<br>')]);
   }
 
   const spielerMap = buildSpielerMap();
@@ -101,15 +100,20 @@ function formatStartzeit(val: unknown): string {
   return '';
 }
 
-function buildHtmlTable(rows: string[][]): string {
+function buildHtmlTable(rows: string[][], hasBu: boolean): string {
   if (rows.length === 0) return '';
-  let html = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;width:100%">';
+  let html = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px;width:100%">';
   html += '<tr style="background:#4A90D9;color:white"><th>Datum</th><th>Zeit</th><th>Ort</th><th>Gegner</th><th>Aufstellung</th></tr>';
   for (const r of rows) {
-    const aufstellung = r[4].replace(/ ★/g, ' <span style="color:#B8860B;font-size:11px">★ besondere Unterstützung</span>');
-    html += `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td style="font-size:12px">${aufstellung}</td></tr>`;
+    const aufstellung = r[4]
+      .replace(/ ★/g, ' <span style="color:#B8860B;font-size:12px">★</span>')
+      .replace(/→/g, '—');
+    html += `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td style="font-size:14px">${aufstellung}</td></tr>`;
   }
   html += '</table>';
+  if (hasBu) {
+    html += '<p style="font-size:12px;color:#888">★ = besondere Unterstützung</p>';
+  }
   return html;
 }
 
@@ -159,24 +163,30 @@ function buildSpielerMap(): Record<string, Spieler> {
 }
 
 function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], spielplanRows: string[][]): void {
-  const htmlTable = buildHtmlTable(spielplanRows);
+  const hasBu = einsaetze.some(e => e.besondereUnterstuetzung);
+  const htmlTable = buildHtmlTable(spielplanRows, hasBu);
 
   let personliche = '';
   for (const e of einsaetze.sort((a, b) => a.datum.localeCompare(b.datum))) {
     const h = e.heimAuswaerts || '';
-    const z = e.startzeit ? ` – ${e.startzeit}` : '';
+    const z = e.startzeit ? ` ${e.startzeit}` : '';
     const bu = e.besondereUnterstuetzung ? ' ★' : '';
     personliche += `<tr><td>${e.datum}${z}</td><td>${h}</td><td>${e.gegner}</td><td>${e.einsatzart}${bu}</td></tr>`;
   }
 
-  const html = `<html><body style="font-family:Arial,sans-serif">
+  let legende = '';
+  if (hasBu) {
+    legende = '<p style="font-size:12px;color:#888">★ = besondere Unterstützung</p>';
+  }
+
+  const html = `<html><body style="font-family:Arial,sans-serif;font-size:14px">
 <p>Hallo ${spieler.name},</p>
 <p>hier ist dein <b>persönlicher Einsatzplan</b>:</p>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px">
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px">
 <tr style="background:#4A90D9;color:white"><th>Datum / Zeit</th><th>Ort</th><th>Gegner</th><th>Einsatzart</th></tr>
 ${personliche}
 </table>
-<p style="font-size:11px;color:#888">★ = besondere Unterstützung</p>
+${legende}
 <p>─── <b>GESAMTSPIELPLAN</b> ───</p>
 ${htmlTable}
 <p>Viele Grüße,<br>Dein Einsatzplaner-Team</p>

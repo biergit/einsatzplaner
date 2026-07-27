@@ -5,54 +5,115 @@ interface ExportResult {
   fileName: string;
 }
 
-function exportAllData(): ExportResult {
+function exportAllData(): void {
+  const userEmail = Session.getActiveUser().getEmail();
+  if (!userEmail || !userEmail.includes('@')) {
+    SpreadsheetApp.getUi().alert(
+      'Fehler',
+      'Export per E-Mail benötigt ein Google-Konto. Deine E-Mail-Adresse konnte nicht ermittelt werden.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const exportData: Record<string, unknown[][]> = {};
+  const blobs: GoogleAppsScript.Base.BlobSource[] = [];
+  const names: string[] = [];
 
-  const sheetNames = [SHEET_NAMES.SPIELER, SHEET_NAMES.ABWESENHEITEN, SHEET_NAMES.SAISON];
+  const spielerBlob = exportSpielerTSV(ss);
+  if (spielerBlob) { blobs.push(spielerBlob); names.push('spieler.tsv'); }
 
-  for (const name of sheetNames) {
-    const sheet = ss.getSheetByName(name);
-    if (sheet) {
-      const lastRow = sheet.getLastRow();
-      const lastCol = sheet.getLastColumn();
-      if (lastRow > 0) {
-        exportData[name] = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-      }
-    }
-  }
+  const abwBlob = exportAbwesenheitenTSV(ss);
+  if (abwBlob) { blobs.push(abwBlob); names.push('abwesenheiten.tsv'); }
 
-  const timestamp = Utilities.formatDate(new Date(), 'Europe/Berlin', 'yyyy-MM-dd_HH-mm-ss');
-  const fileName = `einsatzplaner_export_${timestamp}.json`;
-  const content = JSON.stringify(exportData, null, 2);
+  const saisonBlob = exportSaisonTSV(ss);
+  if (saisonBlob) { blobs.push(saisonBlob); names.push('saison.tsv'); }
 
-  const folder = getOrCreateExportFolder();
-  const existing = folder.getFilesByName(fileName);
+  const einstellungenJson = JSON.stringify(SHEET_CONFIG.einstellungen, null, 2);
+  blobs.push(Utilities.newBlob(einstellungenJson, 'application/json', 'einstellungen.json'));
+  names.push('einstellungen.json');
 
-  let file: GoogleAppsScript.Drive.File;
-  if (existing.hasNext()) {
-    file = existing.next();
-    file.setContent(content);
-  } else {
-    file = folder.createFile(fileName, content, 'application/json');
-  }
-
-  return { fileId: file.getId(), fileName };
+  const timestamp = Utilities.formatDate(new Date(), 'Europe/Berlin', 'dd.MM.yyyy HH:mm');
+  MailApp.sendEmail({
+    to: userEmail,
+    subject: `Einsatzplaner – Datenexport ${timestamp}`,
+    body: `Hallo,\n\nanbei die exportierten Rohdaten des Einsatzplaners vom ${timestamp}.\n\n` +
+      `Die Dateien können in das data/-Verzeichnis des Projekts kopiert werden,\n` +
+      `um das Sheet mit 'Sheet neu aufbauen' wiederherzustellen.\n\n` +
+      `Dateien:\n` +
+      `${names.map(n => `  – ${n}`).join('\n')}\n\n` +
+      `Dein Einsatzplaner-Team`,
+    attachments: blobs,
+  });
 }
 
-function getOrCreateExportFolder(): GoogleAppsScript.Drive.Folder {
-  const props = PropertiesService.getScriptProperties();
-  const folderId = props.getProperty('EXPORT_FOLDER_ID');
+function exportSpielerTSV(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): GoogleAppsScript.Base.Blob | null {
+  const sheet = ss.getSheetByName(SHEET_NAMES.SPIELER);
+  if (!sheet) return null;
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return null;
 
-  if (folderId) {
-    try {
-      return DriveApp.getFolderById(folderId);
-    } catch (_e) {
-      props.deleteProperty('EXPORT_FOLDER_ID');
-    }
+  const data = sheet.getRange(2, 1, lastRow - 1, COL_SPIELER.Rolle).getValues();
+  let tsv = 'Name\tEmail\tRang\tÄnderungen melden\tRolle\n';
+  for (const row of data) {
+    const name = String(row[COL_SPIELER.Name - 1]).trim();
+    if (!name) continue;
+    const email = String(row[COL_SPIELER.Email - 1]).trim();
+    const rang = row[COL_SPIELER.Rang - 1];
+    const melden = row[COL_SPIELER.AenderungenMelden - 1] === true ? 'ja' : '';
+    const rolle = String(row[COL_SPIELER.Rolle - 1]).trim();
+    tsv += `${name}\t${email}\t${rang}\t${melden}\t${rolle}\n`;
   }
+  return Utilities.newBlob(tsv, 'text/tab-separated-values', 'spieler.tsv');
+}
 
-  const folder = DriveApp.createFolder('Einsatzplaner Exports');
-  props.setProperty('EXPORT_FOLDER_ID', folder.getId());
-  return folder;
+function exportAbwesenheitenTSV(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): GoogleAppsScript.Base.Blob | null {
+  const sheet = ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN);
+  if (!sheet) return null;
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return null;
+
+  const data = sheet.getRange(2, 1, lastRow - 1, COL_ABWESENHEITEN.Kommentar).getValues();
+  let tsv = 'Spieler/in\tAbwesenheit von\tAbwesenheit bis\tKommentar\n';
+  for (const row of data) {
+    const spieler = String(row[COL_ABWESENHEITEN.Spieler - 1]).trim();
+    if (!spieler) continue;
+    const von = formatDate(row[COL_ABWESENHEITEN.Von - 1]);
+    const bis = formatDate(row[COL_ABWESENHEITEN.Bis - 1]);
+    if (!von || !bis) continue;
+    const kommentar = String(row[COL_ABWESENHEITEN.Kommentar - 1]).trim();
+    tsv += `${spieler}\t${von}\t${bis}\t${kommentar}\n`;
+  }
+  return Utilities.newBlob(tsv, 'text/tab-separated-values', 'abwesenheiten.tsv');
+}
+
+function exportSaisonTSV(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): GoogleAppsScript.Base.Blob | null {
+  const sheet = ss.getSheetByName(SHEET_NAMES.SAISON);
+  if (!sheet) return null;
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return null;
+
+  const numCols = saisonColCount();
+  const data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
+
+  let tsv = '';
+  for (const row of data) {
+    const rowArr: string[] = [];
+    for (const cell of row) {
+      if (cell instanceof Date) {
+        rowArr.push(Utilities.formatDate(cell, 'Europe/Berlin', 'dd.MM.yyyy'));
+      } else {
+        rowArr.push(String(cell || '').trim());
+      }
+    }
+    tsv += rowArr.join('\t') + '\n';
+  }
+  return Utilities.newBlob(tsv, 'text/tab-separated-values', 'saison.tsv');
+}
+
+function formatDate(val: unknown): string {
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, 'Europe/Berlin', 'dd.MM.yyyy');
+  }
+  return '';
 }

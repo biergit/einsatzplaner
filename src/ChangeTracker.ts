@@ -43,12 +43,15 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
   const oldValue = e.oldValue !== undefined ? String(e.oldValue) : '';
   const newValue = e.value !== undefined ? String(e.value) : '';
 
+  const userEmail = Session.getActiveUser().getEmail();
+  const bearbeiter = userEmail && userEmail.includes('@') ? userEmail : 'Unbekannt';
+
   logChange({
     timestamp: new Date(),
     bereich: `${sheetName}!${range.getA1Notation()}`,
     alterWert: oldValue,
     neuerWert: newValue,
-    bearbeiter: Session.getActiveUser().getEmail(),
+    bearbeiter: bearbeiter,
   });
 
   resetDebounceTimer();

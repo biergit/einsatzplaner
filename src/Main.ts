@@ -37,10 +37,10 @@ function menuSheetNeuAufbauen(): void {
 function menuDatenExportieren(): void {
   const ui = SpreadsheetApp.getUi();
   try {
-    const result = exportAllData();
+    exportAllData();
     ui.alert(
       'Export erfolgreich',
-      `Die Daten wurden exportiert.\n\nExport-ID: ${result.fileId}\n\nDatei: ${result.fileName}`,
+      'Die Rohdaten wurden als E-Mail-Anhang verschickt.',
       ui.ButtonSet.OK
     );
   } catch (e) {
