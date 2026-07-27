@@ -14,26 +14,36 @@ enum COL_ABWESENHEITEN {
   Kommentar = 4,
 }
 
-enum COL_SPIELTERMINE {
-  Datum = 1,
-  HeimGast = 2,
-  Gegner = 3,
-  Ort = 4,
-  Status = 5,
-}
-
-enum COL_AUFSTELLUNGEN {
-  Termin = 1,
-  Typ = 2,
-  Spieler = 3,
-}
-
 enum COL_AENDERUNGSLOG {
   Zeitstempel = 1,
   Bereich = 2,
   AlterWert = 3,
   NeuerWert = 4,
   Bearbeiter = 5,
+}
+
+function saisonMaxSlots(): number {
+  return SHEET_CONFIG.einstellungen.spielformat.einzel + SHEET_CONFIG.einstellungen.spielformat.doppel;
+}
+
+function saisonEinsatzartCol(slotIndex: number): number {
+  return 5 + slotIndex * 2;
+}
+
+function saisonSpielerCol(slotIndex: number): number {
+  return 6 + slotIndex * 2;
+}
+
+function saisonStatusCol(): number {
+  return 5 + saisonMaxSlots() * 2;
+}
+
+function saisonHinweisCol(): number {
+  return saisonStatusCol() + 1;
+}
+
+function saisonErsterSpielerCol(): number {
+  return saisonHinweisCol() + 1;
 }
 
 interface Spieler {
@@ -51,25 +61,15 @@ interface Abwesenheit {
   kommentar: string;
 }
 
-interface Spieltermin {
-  datum: Date;
-  heimGast: 'Heim' | 'Gast';
-  gegner: string;
-  ort: string;
-  status: 'Geplant' | 'Finalisiert' | 'Versendet';
-}
+type AufstellungsTyp = 'Einzel+Doppel' | 'Einzel' | 'Doppel';
 
-interface AufstellungsEintrag {
-  spielterminDatum: Date;
-  typ: AufstellungsTyp;
-  spieler: string;
-}
-
-type AufstellungsTyp = 'Einzel 1' | 'Einzel 2' | 'Einzel 3' | 'Einzel 4' | 'Doppel';
+type AufstellungStatus = 'Geplant' | 'Final';
 
 interface Einstellungen {
   teamName: string;
   saison: string;
+  saisonBeginn: Date;
+  saisonEnde: Date;
   debounceMinuten: number;
   spielformat: {
     einzel: number;
@@ -81,6 +81,5 @@ interface Einstellungen {
 interface SheetConfig {
   spieler: Spieler[];
   abwesenheiten: Abwesenheit[];
-  spieltermine: Spieltermin[];
   einstellungen: Einstellungen;
 }

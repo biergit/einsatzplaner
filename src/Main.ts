@@ -8,8 +8,7 @@ function onOpen(): void {
     .addItem('Daten exportieren', 'menuDatenExportieren')
     .addItem('Aufstellungen generieren', 'menuAufstellungenGenerieren')
     .addSeparator()
-    .addItem('Aufstellungen finalisieren', 'menuAufstellungenFinalisieren')
-    .addItem('Emails an eingesetzte Spieler senden', 'menuEmailsSenden')
+    .addItem('Finalisieren + Emails senden', 'menuFinalisierenUndSenden')
     .addToUi();
 }
 
@@ -17,15 +16,11 @@ function menuSheetNeuAufbauen(): void {
   const ui = SpreadsheetApp.getUi();
   const antwort = ui.alert(
     'Sheet neu aufbauen',
-    'Achtung: Alle bestehenden Daten in diesem Sheet werden gelöscht und durch die Struktur aus der Konfiguration ersetzt.\n\n' +
-    'Bist du sicher?\n\n' +
-    'Vorher solltest du einen Export der aktuellen Daten machen!',
+    'Achtung: Alle bestehenden Daten werden gelöscht!\n\nBist du sicher?',
     ui.ButtonSet.YES_NO
   );
 
-  if (antwort !== ui.Button.YES) {
-    return;
-  }
+  if (antwort !== ui.Button.YES) return;
 
   try {
     const props = PropertiesService.getScriptProperties();
@@ -62,51 +57,39 @@ function menuAufstellungenGenerieren(): void {
   }
 }
 
-function menuAufstellungenFinalisieren(): void {
+function menuFinalisierenUndSenden(): void {
   const ui = SpreadsheetApp.getUi();
+  const antwort = ui.alert(
+    'Finalisieren + Emails senden',
+    'Alle Aufstellungen mit Status "Geplant" werden auf "Final" gesetzt und Einsatz-Mails an die Spieler versendet.\n\nFortfahren?',
+    ui.ButtonSet.YES_NO
+  );
+  if (antwort !== ui.Button.YES) return;
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const termineSheet = ss.getSheetByName(SHEET_NAMES.SPIELTERMINE);
-
-  if (!termineSheet) {
-    ui.alert('Fehler', 'Sheet "Spieltermine" nicht gefunden.', ui.ButtonSet.OK);
+  const saisonSheet = ss.getSheetByName(SHEET_NAMES.SAISON);
+  if (!saisonSheet) {
+    ui.alert('Fehler', 'Saison-Sheet nicht gefunden.', ui.ButtonSet.OK);
     return;
   }
 
-  const lastRow = termineSheet.getLastRow();
-  if (lastRow <= 1) {
-    ui.alert('Keine Termine', 'Es sind keine Spieltermine vorhanden.', ui.ButtonSet.OK);
-    return;
-  }
-
+  const lastRow = saisonSheet.getLastRow();
+  let count = 0;
   for (let row = 2; row <= lastRow; row++) {
-    const statusCell = termineSheet.getRange(row, COL_SPIELTERMINE.Status);
-    const currentStatus = String(statusCell.getValue());
-
-    if (currentStatus === 'Geplant') {
-      statusCell.setValue('Finalisiert');
-    }
-  }
-
-  ui.alert('Fertig', 'Alle geplanten Spieltermine wurden auf "Finalisiert" gesetzt.', ui.ButtonSet.OK);
-}
-
-function menuEmailsSenden(): void {
-  try {
-    sendEinsatzEmails();
-    SpreadsheetApp.getUi().alert('Fertig', 'Die Einsatzpläne wurden per Email versendet.', SpreadsheetApp.getUi().ButtonSet.OK);
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const termineSheet = ss.getSheetByName(SHEET_NAMES.SPIELTERMINE);
-    if (termineSheet) {
-      const lastRow = termineSheet.getLastRow();
-      for (let row = 2; row <= lastRow; row++) {
-        const statusCell = termineSheet.getRange(row, COL_SPIELTERMINE.Status);
-        if (String(statusCell.getValue()) === 'Finalisiert') {
-          statusCell.setValue('Versendet');
-        }
+    const statusCell = saisonSheet.getRange(row, saisonStatusCol());
+    if (String(statusCell.getValue()).trim() === 'Geplant') {
+      const gegner = String(saisonSheet.getRange(row, 2).getValue() || '').trim();
+      if (gegner) {
+        statusCell.setValue('Final');
+        count++;
       }
     }
+  }
+
+  try {
+    sendEinsatzEmails();
+    ui.alert('Fertig', `${count} Spieltermine finalisiert. Einsatz-Mails wurden versendet.`, ui.ButtonSet.OK);
   } catch (e) {
-    SpreadsheetApp.getUi().alert('Fehler', `Beim Versenden ist ein Fehler aufgetreten:\n${e}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    ui.alert('Fehler', `Finalisierung ok (${count} Termine), aber E-Mail-Versand fehlgeschlagen:\n${e}`, ui.ButtonSet.OK);
   }
 }

@@ -4,8 +4,7 @@ const SHEET_NAMES = {
   DOKUMENTATION: 'Dokumentation',
   SPIELER: 'Spieler',
   ABWESENHEITEN: 'Abwesenheiten',
-  SPIELTERMINE: 'Spieltermine',
-  AUFSTELLUNGEN: 'Aufstellungen',
+  SAISON: 'Saison',
   AENDERUNGSLOG: 'Änderungslog',
 } as const;
 
@@ -43,47 +42,43 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['SHEETS IM ÜBERBLICK', '', ''],
     ['Spieler', 'Stammdaten aller Teammitglieder', 'Name, Email (optional), Rang (1 = stärkster), Aktiv, Änderungen melden, Rolle'],
     ['Abwesenheiten', 'Von den Spielern selbst gepflegt', 'Spieler (Dropdown), Von, Bis, Kommentar'],
-    ['Spieltermine', 'Vom Kapitän erfasst', 'Datum, Heim/Gast, Gegner, Ort (optional), Status'],
-    ['Aufstellungen', 'Autom. generiert, manuell anpassbar', 'Termin, Typ (Einzel 1-4 / Doppel), Spieler'],
+    ['Saison', 'Zentrale Übersicht – ein Tab pro Kalendertag', 'Datum, Gegner, Startzeit, Heim/Auswärts, Aufstellung, Status, Spieler-Anwesenheit'],
     ['Änderungslog', 'Automatisch, versteckt', 'Protokoll aller Änderungen durch Teammitglieder'],
     ['', '', ''],
     ['SPALTEN-ERKLÄRUNG: SPIELER', '', ''],
     ['Name', 'Vor- und Nachname', 'Wird in allen Dropdowns verwendet'],
     ['Email', 'Optional – Google-Mail-Adresse', 'Fehlt sie, wird der Kapitän nach dem E-Mail-Versand informiert'],
-    ['Rang', '1 = stärkster Spieler, 2 = zweitstärkster usw.', 'Bestimmt die Position in der automatischen Aufstellung'],
-    ['Aktiv', 'Checkbox', 'Nur aktive Spieler werden bei der Aufstellungs-Generierung berücksichtigt. Inaktive Spieler (kein Haken) tauchen in keiner Aufstellung auf.'],
-    ['Änderungen melden', 'Checkbox', 'Wer hier einen Haken setzt, bekommt nach Sheet-Änderungen durch andere eine E-Mail mit den letzten Änderungen'],
-    ['Rolle', 'Dropdown: "Kapitän" oder leer', 'Nur der Kapitän bekommt nach dem E-Mail-Versand einen Hinweis über eingesetzte Spieler ohne E-Mail-Adresse'],
+    ['Rang', '1 = stärkster Spieler', 'Bestimmt die Reihenfolge in der automatischen Aufstellung'],
+    ['Aktiv', 'Checkbox', 'Nur aktive Spieler werden bei der Aufstellungs-Generierung berücksichtigt'],
+    ['Änderungen melden', 'Checkbox', 'Wer hier einen Haken setzt, bekommt nach Sheet-Änderungen durch andere eine E-Mail'],
+    ['Rolle', 'Dropdown: "Kapitän" oder leer', 'Der Kapitän bekommt nach dem E-Mail-Versand einen Hinweis über eingesetzte Spieler ohne E-Mail-Adresse'],
     ['', '', ''],
     ['SPALTEN-ERKLÄRUNG: ABWESENHEITEN', '', ''],
-    ['Spieler', 'Dropdown aus Spieler-Liste', 'Von wem die Abwesenheit gemeldet wird'],
-    ['Abwesenheit von / bis', 'Datum im Format TT.MM.JJJJ', 'Erster und letzter Tag der Abwesenheit'],
-    ['Kommentar', 'Freitext', 'Hinweise wie "nur wenn es sein muss" werden gelb markiert – Spieler wird dann trotzdem bei Aufstellung berücksichtigt'],
+    ['Spieler', 'Dropdown aus Spieler-Liste', ''],
+    ['Abwesenheit von / bis', 'Datum TT.MM.JJJJ', 'Erster und letzter Tag'],
+    ['Kommentar', 'Freitext', '"nur wenn es sein muss" wird gelb markiert – Spieler wird dennoch aufgestellt'],
     ['', '', ''],
-    ['SPALTEN-ERKLÄRUNG: SPIELTERMINE', '', ''],
-    ['Datum', 'Datum im Format TT.MM.JJJJ', 'Tag des Spiels'],
-    ['Heim / Gast', 'Dropdown: Heim oder Gast', ''],
-    ['Gegner', 'Name des gegnerischen Teams', ''],
-    ['Ort', 'Optional – Adresse der Spielstätte', ''],
-    ['Status', 'Dropdown: Geplant / Finalisiert / Versendet', 'Grün = Geplant, Gelb = Finalisiert, Lila = Versendet'],
-    ['', '', ''],
-    ['SPALTEN-ERKLÄRUNG: AUFSTELLUNGEN', '', ''],
-    ['Termin', 'Dropdown aus Spieltermine', 'Für welches Spiel die Aufstellung gilt'],
-    ['Typ', 'Dropdown: Einzel 1-4 oder Doppel', '4 Einzel + 2 Doppel pro Termin. Doppel-Paare legt der Kapitän vor Ort fest.'],
-    ['Spieler', 'Dropdown aus Spieler-Liste', 'Wer auf dieser Position spielt'],
+    ['SPALTEN-ERKLÄRUNG: SAISON', '', ''],
+    ['Datum', 'Automatisch vorausgefüllt', 'Alle Tage von saisonBeginn bis saisonEnde'],
+    ['Gegner', 'Vom Kapitän ausgefüllt', 'Ein Eintrag hier macht den Tag zum Spieltag'],
+    ['Startzeit', 'Optional', 'Uhrzeit des Spielbeginns'],
+    ['Heim/Auswärts', 'Dropdown: Heim oder Auswärts', ''],
+    ['Einsatzart (1-6)', 'Einzel+Doppel / Einzel / Doppel', 'Pro Spieler-Slot: welche Rolle der Spieler übernimmt'],
+    ['Spieler (1-6)', 'Dropdown + Freitext', 'Wer auf dieser Position spielt (auch Gastspieler möglich)'],
+    ['Status', 'Dropdown: Geplant / Final', 'Geplant = Entwurf, Final = bestätigt (löst E-Mails aus)'],
+    ['Hinweis', 'Automatisch gefüllt', 'Warnt vor abwesenden/inaktiven Spielern in der Aufstellung'],
+    ['Spieler-Spalten', 'Formel (automatisch)', 'Zeigt An- oder Abwesenheit jedes Spielers am jeweiligen Tag'],
     ['', '', ''],
     ['MENÜ "EINSATZPLANER"', '', ''],
-    ['Sheet neu aufbauen', '', 'Löscht ALLE Daten und baut die Sheets aus der Konfiguration neu auf. Vorher Daten exportieren!'],
-    ['Daten exportieren', '', 'Sichert alle Sheet-Daten als JSON-Datei auf Google Drive (Ordner "Einsatzplaner Exports")'],
-    ['Aufstellungen generieren', '', 'Ermittelt verfügbare Spieler (aktiv + nicht abwesend) und weist sie nach Rang den Positionen zu'],
-    ['Aufstellungen finalisieren', '', 'Setzt den Status aller geplanten Spieltermine auf "Finalisiert"'],
-    ['Emails senden', '', 'Sendet jedem eingesetzten Spieler seinen Einsatzplan per E-Mail. Spieler ohne E-Mail werden dem Kapitän gemeldet.'],
+    ['Sheet neu aufbauen', '', 'Löscht alle Daten und baut Sheets aus der Konfiguration neu. Keine E-Mails.'],
+    ['Daten exportieren', '', 'Sichert alle Daten als JSON nach Google Drive'],
+    ['Aufstellungen generieren', '', 'Füllt leere Aufstellungs-Zellen basierend auf Rang + Verfügbarkeit'],
+    ['Aufstellung finalisieren + senden', '', 'Setzt Geplant→Final und versendet E-Mails an betroffene Spieler'],
     ['', '', ''],
-    ['BENACHRICHTIGUNGEN (AUTOMATISCH)', '', ''],
-    ['Änderungslog', '', 'Jede Bearbeitung an Spieler-, Abwesenheiten- oder Spieltermine-Sheet wird protokolliert'],
-    ['Änderungs-Mail', '', 'Nach 5 Minuten ohne weitere Änderung erhalten alle mit Haken bei "Änderungen melden" eine E-Mail – außer dem Bearbeiter selbst'],
-    ['Aufstellungs-Mail', '', 'Über das Menü manuell ausgelöst. Jeder eingesetzte Spieler mit E-Mail bekommt seinen Plan.'],
-    ['Kapitän-Hinweis', '', 'Spieler ohne E-Mail werden dem Kapitän nach dem E-Mail-Versand gemeldet.'],
+    ['BENACHRICHTIGUNGEN', '', ''],
+    ['Änderungs-Mail', '', 'Nach debounceMinuten Inaktivität erhalten alle mit "Änderungen melden"-Haken eine Mail (nicht der Bearbeiter selbst)'],
+    ['Aufstellungs-Mail', '', 'Bei Finalisierung werden neu eingesetzte, entfernte und interessierte Spieler informiert'],
+    ['Kapitän-Hinweis', '', 'Spieler ohne E-Mail werden dem Kapitän gemeldet'],
   ];
 
   const numCols = 3;
@@ -92,10 +87,11 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
   sheet.getRange(1, 1, 2, numCols).setFontWeight('bold').setFontSize(14).setBackground('#E8F0FE');
   sheet.getRange(4, 1, 1, numCols).setFontWeight('bold').setFontSize(12).setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
   sheet.getRange(6, 1, 1, numCols).setFontWeight('bold').setBackground('#E8F0FE');
-  sheet.getRange(13, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
+  sheet.getRange(14, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
   sheet.getRange(21, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
-  sheet.getRange(30, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
-  sheet.getRange(37, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
+  sheet.getRange(29, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
+  sheet.getRange(42, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
+  sheet.getRange(49, 1, 1, numCols).setFontWeight('bold').setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
 
   sheet.setFrozenRows(0);
   return sheet;
@@ -215,125 +211,150 @@ function buildAbwesenheitenSheet(config: SheetConfig): GoogleAppsScript.Spreadsh
   return sheet;
 }
 
-function buildSpieltermineSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.Sheet {
-  const sheet = getOrCreateSheet(SHEET_NAMES.SPIELTERMINE);
-  const headers = ['Datum', 'Heim / Gast', 'Gegner', 'Ort', 'Status'];
-  const numCols = headers.length;
+function buildSaisonSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.Sheet {
+  const sheet = getOrCreateSheet(SHEET_NAMES.SAISON);
+  const maxSlots = saisonMaxSlots();
+  const firstSpielerCol = saisonErsterSpielerCol();
+  const lastCol = firstSpielerCol - 1 + config.spieler.length;
 
-  sheet.getRange(1, 1, 1, numCols).setValues([headers]);
-  formatHeader(sheet, numCols);
-
-  if (config.spieltermine.length > 0) {
-    const data = config.spieltermine.map(t => {
-      const datumStr = `${pad(t.datum.getDate())}.${pad(t.datum.getMonth() + 1)}.${t.datum.getFullYear()}`;
-      return [datumStr, t.heimGast, t.gegner, t.ort, t.status];
-    });
-    sheet.getRange(2, 1, data.length, numCols).setValues(data);
+  const headers: string[] = ['Datum', 'Gegner', 'Startzeit', 'Heim / Auswärts'];
+  for (let i = 0; i < maxSlots; i++) {
+    headers.push(`Einsatzart ${i + 1}`);
+    headers.push(`Spieler ${i + 1}`);
+  }
+  headers.push('Status');
+  headers.push('Hinweis');
+  for (const s of config.spieler) {
+    headers.push(s.name);
   }
 
-  sheet.setColumnWidth(COL_SPIELTERMINE.Datum, 120);
-  sheet.setColumnWidth(COL_SPIELTERMINE.HeimGast, 100);
-  sheet.setColumnWidth(COL_SPIELTERMINE.Gegner, 220);
-  sheet.setColumnWidth(COL_SPIELTERMINE.Ort, 300);
-  sheet.setColumnWidth(COL_SPIELTERMINE.Status, 120);
-
-  const lastRow = sheet.getMaxRows() - 1;
-
-  sheet.getRange(2, COL_SPIELTERMINE.Datum, lastRow, 1).setNumberFormat('DD.MM.YYYY');
-
-  sheet.getRange(2, COL_SPIELTERMINE.HeimGast, lastRow, 1).setDataValidation(
-    SpreadsheetApp.newDataValidation()
-      .requireValueInList(['Heim', 'Gast'])
-      .setAllowInvalid(true)
-      .build()
-  );
-
-  sheet.getRange(2, COL_SPIELTERMINE.Status, lastRow, 1).setDataValidation(
-    SpreadsheetApp.newDataValidation()
-      .requireValueInList(['Geplant', 'Finalisiert', 'Versendet'])
-      .setAllowInvalid(true)
-      .build()
-  );
-
-  const statusRange = sheet.getRange(2, COL_SPIELTERMINE.Status, lastRow, 1);
-  sheet.setConditionalFormatRules([
-    SpreadsheetApp.newConditionalFormatRule()
-      .whenTextEqualTo('Geplant')
-      .setBackground('#D9EAD3')
-      .setRanges([statusRange])
-      .build(),
-    SpreadsheetApp.newConditionalFormatRule()
-      .whenTextEqualTo('Finalisiert')
-      .setBackground('#FFF2CC')
-      .setRanges([statusRange])
-      .build(),
-    SpreadsheetApp.newConditionalFormatRule()
-      .whenTextEqualTo('Versendet')
-      .setBackground('#D9D2E9')
-      .setRanges([statusRange])
-      .build(),
-  ]);
-
-  sheet.setFrozenRows(1);
-  return sheet;
-}
-
-function buildAufstellungenSheet(): GoogleAppsScript.Spreadsheet.Sheet {
-  const sheet = getOrCreateSheet(SHEET_NAMES.AUFSTELLUNGEN);
-  const headers = ['Termin', 'Typ', 'Spieler'];
   const numCols = headers.length;
-
   sheet.getRange(1, 1, 1, numCols).setValues([headers]);
   formatHeader(sheet, numCols);
 
-  sheet.setColumnWidth(COL_AUFSTELLUNGEN.Termin, 120);
-  sheet.setColumnWidth(COL_AUFSTELLUNGEN.Typ, 120);
-  sheet.setColumnWidth(COL_AUFSTELLUNGEN.Spieler, 200);
+  sheet.setColumnWidth(1, 100);
+  sheet.setColumnWidth(2, 200);
+  sheet.setColumnWidth(3, 80);
+  sheet.setColumnWidth(4, 100);
+  for (let i = 0; i < maxSlots; i++) {
+    sheet.setColumnWidth(saisonEinsatzartCol(i), 120);
+    sheet.setColumnWidth(saisonSpielerCol(i), 180);
+  }
+  sheet.setColumnWidth(saisonStatusCol(), 100);
+  sheet.setColumnWidth(saisonHinweisCol(), 300);
+  for (let i = 0; i < config.spieler.length; i++) {
+    sheet.setColumnWidth(firstSpielerCol + i, 130);
+  }
 
-  sheet.getRange(1, 1, sheet.getMaxRows(), 1).setNumberFormat('DD.MM.YYYY');
+  const beginn = new Date(config.einstellungen.saisonBeginn);
+  const ende = new Date(config.einstellungen.saisonEnde);
+  const dayCount = Math.floor((ende.getTime() - beginn.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-  const lastRow = sheet.getMaxRows() - 1;
+  for (let row = 0; row < dayCount; row++) {
+    const d = new Date(beginn.getTime() + row * 86400000);
+    sheet.getRange(row + 2, 1).setValue(d).setNumberFormat('DD.MM.YYYY');
+  }
+
+  const lastRow = dayCount + 1;
+
+  sheet.getRange(2, 1, lastRow - 1, 1).setNumberFormat('DD.MM.YYYY');
+
+  sheet.getRange(2, 4, lastRow - 1, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireValueInList(['Heim', 'Auswärts'])
+      .setAllowInvalid(true)
+      .build()
+  );
+
+  for (let i = 0; i < maxSlots; i++) {
+    sheet.getRange(2, saisonEinsatzartCol(i), lastRow - 1, 1).setDataValidation(
+      SpreadsheetApp.newDataValidation()
+        .requireValueInList(['Einzel+Doppel', 'Einzel', 'Doppel'])
+        .setAllowInvalid(true)
+        .build()
+    );
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-
   const spielerSheet = ss.getSheetByName(SHEET_NAMES.SPIELER);
   if (spielerSheet) {
     const spielerLastRow = spielerSheet.getLastRow();
     if (spielerLastRow > 1) {
       const spielerRange = spielerSheet.getRange(2, COL_SPIELER.Name, spielerLastRow - 1, 1);
-      sheet.getRange(2, COL_AUFSTELLUNGEN.Spieler, lastRow, 1).setDataValidation(
-        SpreadsheetApp.newDataValidation()
-          .requireValueInRange(spielerRange)
-          .setAllowInvalid(true)
-          .build()
-      );
+      for (let i = 0; i < maxSlots; i++) {
+        sheet.getRange(2, saisonSpielerCol(i), lastRow - 1, 1).setDataValidation(
+          SpreadsheetApp.newDataValidation()
+            .requireValueInRange(spielerRange)
+            .setAllowInvalid(true)
+            .build()
+        );
+      }
     }
   }
 
-  const termineSheet = ss.getSheetByName(SHEET_NAMES.SPIELTERMINE);
-  if (termineSheet) {
-    const termineLastRow = termineSheet.getLastRow();
-    if (termineLastRow > 1) {
-      const termineRange = termineSheet.getRange(2, COL_SPIELTERMINE.Datum, termineLastRow - 1, 1);
-      sheet.getRange(2, COL_AUFSTELLUNGEN.Termin, lastRow, 1).setDataValidation(
-        SpreadsheetApp.newDataValidation()
-          .requireValueInRange(termineRange)
-          .setAllowInvalid(true)
-          .build()
-      );
-    }
-  }
-
-  sheet.getRange(2, COL_AUFSTELLUNGEN.Typ, lastRow, 1).setDataValidation(
+  sheet.getRange(2, saisonStatusCol(), lastRow - 1, 1).setDataValidation(
     SpreadsheetApp.newDataValidation()
-      .requireValueInList([
-        'Einzel 1', 'Einzel 2', 'Einzel 3', 'Einzel 4', 'Doppel',
-      ])
+      .requireValueInList(['Geplant', 'Final'])
       .setAllowInvalid(true)
       .build()
   );
 
+  for (let pi = 0; pi < config.spieler.length; pi++) {
+    const playerCol = firstSpielerCol + pi;
+    const spielerName = config.spieler[pi].name;
+    const colLetter = colToLetter(playerCol);
+
+    for (let row = 2; row <= lastRow; row++) {
+      const col2Letter = colToLetter(COL_ABWESENHEITEN.Spieler);
+      const vonLetter = colToLetter(COL_ABWESENHEITEN.Von);
+      const bisLetter = colToLetter(COL_ABWESENHEITEN.Bis);
+      const komLetter = colToLetter(COL_ABWESENHEITEN.Kommentar);
+
+      const formula = `=LET(abw; FILTER(${col2Letter}:${col2Letter}; ${col2Letter}:${col2Letter}="${spielerName}"; ${vonLetter}:${vonLetter}<=A${row}; ${bisLetter}:${bisLetter}>=A${row}); IF(COUNTA(abw)>0; "✗ " & INDEX(abw;1;1); "✓"))`;
+
+      sheet.getRange(row, playerCol).setFormula(formula);
+    }
+
+    const playerRange = sheet.getRange(2, playerCol, lastRow - 1, 1);
+    sheet.setConditionalFormatRules([
+      ...sheet.getConditionalFormatRules(),
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenTextStartsWith('✓')
+        .setBackground('#D9EAD3')
+        .setRanges([playerRange])
+        .build(),
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenTextStartsWith('✗')
+        .setBackground('#F4CCCC')
+        .setRanges([playerRange])
+        .build(),
+    ]);
+  }
+
+  const filterRange = sheet.getRange(1, 1, lastRow, numCols);
+  if (filterRange.getFilter()) {
+    filterRange.getFilter()!.remove();
+  }
+  filterRange.createFilter();
+  const filterCol2 = 2;
+  const criteria = SpreadsheetApp.newFilterCriteria()
+    .whenCellNotEmpty()
+    .build();
+  sheet.getFilter()!.setColumnFilterCriteria(filterCol2, criteria);
+
   sheet.setFrozenRows(1);
+  sheet.setFrozenColumns(1);
   return sheet;
+}
+
+function colToLetter(col: number): string {
+  let letter = '';
+  while (col > 0) {
+    const rem = (col - 1) % 26;
+    letter = String.fromCharCode(65 + rem) + letter;
+    col = Math.floor((col - 1) / 26);
+  }
+  return letter;
 }
 
 function buildAenderungslogSheet(): GoogleAppsScript.Spreadsheet.Sheet {
@@ -350,7 +371,8 @@ function buildAenderungslogSheet(): GoogleAppsScript.Spreadsheet.Sheet {
   sheet.setColumnWidth(COL_AENDERUNGSLOG.NeuerWert, 250);
   sheet.setColumnWidth(COL_AENDERUNGSLOG.Bearbeiter, 200);
 
-  sheet.getRange(1, COL_AENDERUNGSLOG.Zeitstempel, sheet.getMaxRows(), 1).setNumberFormat('DD.MM.YYYY HH:MM:SS');
+  sheet.getRange(1, COL_AENDERUNGSLOG.Zeitstempel, sheet.getMaxRows(), 1)
+    .setNumberFormat('DD.MM.YYYY HH:MM:SS');
 
   sheet.setFrozenRows(1);
   sheet.hideSheet();
@@ -364,9 +386,8 @@ function pad(n: number): string {
 function buildAllSheets(config: SheetConfig): void {
   buildDokumentationSheet(config.einstellungen);
   buildSpielerSheet(config);
-  buildSpieltermineSheet(config);
   buildAbwesenheitenSheet(config);
-  buildAufstellungenSheet();
+  buildSaisonSheet(config);
   buildAenderungslogSheet();
 
   const knownNames: ReadonlySet<string> = new Set(Object.values(SHEET_NAMES));
@@ -378,5 +399,5 @@ function buildAllSheets(config: SheetConfig): void {
     }
   }
 
-  ss.setActiveSheet(ss.getSheetByName(SHEET_NAMES.DOKUMENTATION)!);
+  ss.setActiveSheet(ss.getSheetByName(SHEET_NAMES.SAISON)!);
 }

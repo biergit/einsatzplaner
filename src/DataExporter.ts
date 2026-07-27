@@ -12,8 +12,7 @@ function exportAllData(): ExportResult {
   const sheetNames = [
     SHEET_NAMES.SPIELER,
     SHEET_NAMES.ABWESENHEITEN,
-    SHEET_NAMES.SPIELTERMINE,
-    SHEET_NAMES.AUFSTELLUNGEN,
+    SHEET_NAMES.SAISON,
   ];
 
   for (const name of sheetNames) {
@@ -25,14 +24,6 @@ function exportAllData(): ExportResult {
         const range = sheet.getRange(1, 1, lastRow, lastCol);
         exportData[name] = range.getValues();
       }
-    }
-  }
-
-  const config = ss.getSheetByName('Einstellungen');
-  if (config) {
-    const lastRow = config.getLastRow();
-    if (lastRow > 0) {
-      exportData['Einstellungen'] = config.getRange(1, 1, lastRow, 2).getValues();
     }
   }
 

@@ -1,6 +1,9 @@
 {
   "teamName": "TT Team Musterstadt",
   "saison": "2026/2027",
+  "saisonBeginn": "2026-09-01",
+  "saisonEnde": "2026-12-31",
+  "debounceMinuten": 5,
   "spielformat": {
     "einzel": 4,
     "doppel": 2,

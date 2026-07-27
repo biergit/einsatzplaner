@@ -22,7 +22,6 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
 
   if (
     sheetName === SHEET_NAMES.AENDERUNGSLOG ||
-    sheetName === SHEET_NAMES.AUFSTELLUNGEN ||
     sheetName === SHEET_NAMES.DOKUMENTATION
   ) {
     return;

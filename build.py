@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Baut dist/Config.js aus den Datendateien im angegebenen data-Verzeichnis.
-Überschreibt das kompilierte Config.js mit echten Daten.
-
-Verwendung:
-  python3 build.py                    # liest data/
-  python3 build.py --data-dir test-data    # liest test-data/
-"""
+"""Baut dist/Config.js aus den Datendateien im angegebenen data-Verzeichnis."""
 
 import argparse
 import csv
@@ -40,12 +34,12 @@ def read_spieler(data_dir: str) -> list[dict]:
             if not name:
                 continue
             melden_raw = row.get("Änderungen melden", "").strip().lower()
-            melden = melden_raw in ("ja", "true", "1", "x", "✓")
+            melden = melden_raw in ("ja", "true", "1", "x")
             rolle = row.get("Rolle", "").strip()
             result.append({
                 "name": name,
                 "email": row.get("Email", "").strip(),
-                "rang": int(row.get("Rang", "99")),
+                "rang": int(row.get("Rang", "99") or 99),
                 "aenderungenMelden": "true" if melden else "false",
                 "rolle": rolle if rolle == "Kapitän" else "",
             })
@@ -76,28 +70,6 @@ def read_abwesenheiten(data_dir: str) -> list[dict]:
         return result
 
 
-def read_spieltermine(data_dir: str) -> list[dict]:
-    path = os.path.join(data_dir, "spieltermine.tsv")
-    if not os.path.exists(path):
-        print(f"  [skip] {path} nicht gefunden")
-        return []
-    with open(path, encoding="utf-8") as f:
-        reader = csv.DictReader(f, delimiter="\t")
-        result = []
-        for row in reader:
-            datum_str = row.get("Datum", "").strip()
-            if not datum_str:
-                continue
-            result.append({
-                "datum": parse_date(datum_str),
-                "heimGast": row.get("Heim/Gast", "Heim").strip(),
-                "gegner": row.get("Gegner", "").strip(),
-                "ort": row.get("Ort", "").strip(),
-                "status": "Geplant",
-            })
-        return result
-
-
 def read_einstellungen(data_dir: str) -> dict:
     path = os.path.join(data_dir, "einstellungen.json")
     if not os.path.exists(path):
@@ -105,6 +77,8 @@ def read_einstellungen(data_dir: str) -> dict:
         return {
             "teamName": "TT Team",
             "saison": "2026/2027",
+            "saisonBeginn": "2026-09-01",
+            "saisonEnde": "2026-12-31",
             "debounceMinuten": 5,
             "spielformat": {"einzel": 4, "doppel": 2, "system": "Bundessystem"},
         }
@@ -112,13 +86,15 @@ def read_einstellungen(data_dir: str) -> dict:
         return json.load(f)
 
 
-def generate_js(spieler, abwesenheiten, spieltermine, einstellungen) -> str:
+def generate_js(spieler, abwesenheiten, einstellungen) -> str:
     lines = ["// GENERIERT von build.py – nicht manuell bearbeiten.", ""]
     lines.append("var SHEET_CONFIG = {")
 
     lines.append("  einstellungen: {")
     lines.append(f"    teamName: '{einstellungen['teamName']}',")
     lines.append(f"    saison: '{einstellungen['saison']}',")
+    lines.append(f"    saisonBeginn: new Date('{einstellungen['saisonBeginn']}'),")
+    lines.append(f"    saisonEnde: new Date('{einstellungen['saisonEnde']}'),")
     debounce = einstellungen.get("debounceMinuten", 5)
     lines.append(f"    debounceMinuten: {debounce},")
     sf = einstellungen["spielformat"]
@@ -146,17 +122,6 @@ def generate_js(spieler, abwesenheiten, spieltermine, einstellungen) -> str:
         lines.append("    },")
     lines.append("  ],")
 
-    lines.append("  spieltermine: [")
-    for t in spieltermine:
-        lines.append("    {")
-        lines.append(f"      datum: new Date('{t['datum'].isoformat()}'),")
-        lines.append(f"      heimGast: '{t['heimGast']}',")
-        lines.append(f"      gegner: '{t['gegner']}',")
-        lines.append(f"      ort: '{t['ort']}',")
-        lines.append(f"      status: '{t['status']}',")
-        lines.append("    },")
-    lines.append("  ],")
-
     lines.append("};")
     lines.append("")
     return "\n".join(lines)
@@ -177,15 +142,11 @@ def main():
     abwesenheiten = read_abwesenheiten(data_dir)
     print(f"    {len(abwesenheiten)} Abwesenheiten gelesen")
 
-    print("  Lese spieltermine.tsv ...")
-    spieltermine = read_spieltermine(data_dir)
-    print(f"    {len(spieltermine)} Spieltermine gelesen")
-
     print("  Lese einstellungen.json ...")
     einstellungen = read_einstellungen(data_dir)
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-    content = generate_js(spieler, abwesenheiten, spieltermine, einstellungen)
+    content = generate_js(spieler, abwesenheiten, einstellungen)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write(content)
 

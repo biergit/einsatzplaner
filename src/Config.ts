@@ -4,6 +4,8 @@ const SHEET_CONFIG: SheetConfig = {
   einstellungen: {
     teamName: 'TT Team',
     saison: '2026/2027',
+    saisonBeginn: new Date('2026-09-01'),
+    saisonEnde: new Date('2026-12-31'),
     debounceMinuten: 5,
     spielformat: {
       einzel: 4,
@@ -13,5 +15,4 @@ const SHEET_CONFIG: SheetConfig = {
   },
   spieler: [],
   abwesenheiten: [],
-  spieltermine: [],
 };

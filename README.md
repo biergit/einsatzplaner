@@ -18,8 +18,7 @@ Die Dateien im `data/`-Verzeichnis enthalten die Team-Daten (gitignored – kein
 |-------|--------|--------|
 | `spieler.tsv` | TSV | Name, Email, Rang, Änderungen melden, Rolle |
 | `abwesenheiten.tsv` | TSV | Spieler, Von, Bis, Kommentar |
-| `spieltermine.tsv` | TSV | Datum, Heim/Gast, Gegner, Ort |
-| `einstellungen.json` | JSON | teamName, saison, debounceMinuten, spielformat |
+| `einstellungen.json` | JSON | teamName, saison, saisonBeginn, saisonEnde, debounceMinuten, spielformat |
 
 Vorlagen liegen als `.sample`-Dateien im `data/`-Verzeichnis.
 
@@ -96,8 +95,7 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 | **Dokumentation** | Erläuterung aller Spalten, Funktionen und des Workflows |
 | **Spieler** | Name, Email (optional), Rang, Aktiv, Änderungen melden, Rolle |
 | **Abwesenheiten** | Spieler, Von, Bis, Kommentar |
-| **Spieltermine** | Datum, Heim/Gast, Gegner, Ort (optional), Status |
-| **Aufstellungen** | Termin, Typ (Einzel/Doppel), Spieler |
+| **Saison** | Zentrale Übersicht: jeder Tag eine Zeile, Spieltage mit Gegner/Aufstellung, Spieler-Anwesenheit per Formel |
 | **Änderungslog** | Automatisches Protokoll aller Änderungen (versteckt) |
 
 ## Menü-Funktionen
@@ -106,16 +104,15 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 |-----------|-------------|
 | Sheet neu aufbauen | Löscht alle Sheets und baut sie aus der Konfiguration neu auf. Löst **keine** E-Mail-Benachrichtigungen aus. |
 | Daten exportieren | Sichert alle Daten als JSON nach Google Drive |
-| Aufstellungen generieren | Ermittelt verfügbare Spieler pro Termin und füllt das Aufstellungs-Sheet |
-| Aufstellungen finalisieren | Setzt Status aller geplanten Termine auf "Finalisiert" |
-| Emails senden | Versendet Einsatzpläne an alle eingesetzten Spieler mit E-Mail und informiert den Kapitän über Spieler ohne E-Mail |
+| Aufstellungen generieren | Füllt leere Aufstellungs-Zellen basierend auf Rang + Verfügbarkeit |
+| Finalisieren + Emails senden | Setzt Geplant→Final und versendet Einsatz-Mails |
 
 ## Automatische Benachrichtigungen
 
 - Bei jeder Bearbeitung durch ein Teammitglied wird die Änderung protokolliert
 - Nach einer konfigurierbaren Zeitspanne ohne weitere Änderung (`debounceMinuten` in `einstellungen.json`) erhalten alle Spieler mit Checkbox **Änderungen melden** eine E-Mail mit den letzten Änderungen – außer sie waren selbst die Bearbeiter
 - Der Bearbeiter wird anhand seiner Google-Account-E-Mail identifiziert
-- Änderungen am Dokumentation-, Aufstellungs- und Änderungslog-Sheet lösen keine Benachrichtigung aus
+- Änderungen am Dokumentation- und Änderungslog-Sheet lösen keine Benachrichtigung aus
 - Der Neuaufbau des Sheets (Menü → Sheet neu aufbauen) löst keine Benachrichtigungen aus
 
 ## Rollen

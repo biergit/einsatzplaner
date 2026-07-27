@@ -50,6 +50,11 @@ describe('generated Config.js', () => {
     expect(content).toContain("teamName: 'TT Team Test'");
   });
 
+  it('contains test saison dates', () => {
+    expect(content).toContain("saisonBeginn: new Date('2026-09-01')");
+    expect(content).toContain("saisonEnde: new Date('2026-12-31')");
+  });
+
   it('contains test debounceMinuten', () => {
     expect(content).toContain('debounceMinuten: 1');
   });
@@ -75,20 +80,13 @@ describe('generated Config.js', () => {
     expect(content).toContain("name: 'Erika Musterfrau', email: '', rang: 4, aenderungenMelden: false, rolle: ''");
   });
 
-  it('contains all 4 test spieltermine', () => {
-    const expected = [
-      'TT Musterdorf',
-      'SV Beispielstadt',
-      'TSV Testort',
-      'TT Nachbarstadt',
-    ];
-    for (const gegner of expected) {
-      expect(content).toContain(`gegner: '${gegner}'`);
-    }
-  });
-
   it('contains 6 test abwesenheiten', () => {
     const absences = (content.match(/spieler: '/g) || []).length;
     expect(absences).toBeGreaterThanOrEqual(6);
+  });
+
+  it('does not reference spieltermine or aufstellungen sheets', () => {
+    expect(content).not.toContain('spieltermine');
+    expect(content).not.toContain('Aufstellungen');
   });
 });
