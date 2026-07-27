@@ -54,7 +54,7 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['', '', ''],
     ['SAISON-SPALTEN', '', ''],
     ['Datum', 'Vorausgefüllt (saisonBeginn–saisonEnde)', ''],
-    ['Gegner', 'Vom Kapitän gefüllt – macht den Tag zum Spieltag', ''],
+    ['Gegner', 'Vom Kapitän gefüllt – macht den Tag zum Spieltag', 'Danach Filteransicht für Spielplan nutzen: Daten → Filteransichten → Neue Filteransicht, Spalte B filtern: nicht leer'],
     ['Startzeit', 'Optional', ''],
     ['Heim / Auswärts', 'Dropdown: Heim, Auswärts', ''],
     ['Pro Spieler (Name als Spaltenkopf)', `Dropdown: ${ALLE_AUFSTELLUNGS_TYPEN.join(', ')}. Bei Abwesenheit erscheint ✗ Kommentar.`, ''],
@@ -238,15 +238,6 @@ function buildSaisonSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.She
   sheet.getRange(2, saisonStatusCol(), lastRow - 1, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInList(['Geplant', 'Final']).setAllowInvalid(true).build()
   );
-
-  const filterRange = sheet.getRange(1, 1, lastRow, numCols);
-  if (filterRange.getFilter()) filterRange.getFilter()!.remove();
-
-  const filter = filterRange.createFilter();
-  filter.setColumnFilterCriteria(saisonGegnerCol(),
-    SpreadsheetApp.newFilterCriteria().whenCellNotEmpty().build()
-  );
-  filter.remove();
 
   sheet.setFrozenRows(1);
   sheet.setFrozenColumns(saisonHeimAuswaertsCol());
