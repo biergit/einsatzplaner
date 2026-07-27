@@ -16,7 +16,8 @@
     "save:test": "cp .clasp.json .clasp.json.test",
     "login": "npx clasp login",
     "create": "npx clasp create --type sheets --title 'TT Einsatzplaner' --rootDir ./dist",
-    "open": "npx clasp open",
+    "open": "npx clasp open-container",
+    "open:script": "npx clasp open-script",
     "test": "vitest run",
     "test:watch": "vitest"
   },

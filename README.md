@@ -45,6 +45,7 @@ Die Script-IDs werden in `.clasp.json.prod` und `.clasp.json.test` abgelegt (bei
 npm run deploy              # Schaltet auf Produktiv → baut → pushed
 npm run deploy:test         # Schaltet auf Test → baut mit Testdaten → pushed
 npm run open               # Öffnet das aktuell aktive Sheet im Browser
+npm run open:script        # Öffnet den Apps Script Editor
 ```
 
 `deploy` und `deploy:test` kümmern sich automatisch um das Umschalten des Script-Kontexts. Kein manuelles Kopieren nötig.
@@ -86,6 +87,7 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 | `npm run switch:prod` | Auf Produktiv-Script umschalten |
 | `npm run switch:test` | Auf Test-Script umschalten |
 | `npm run open` | Aktuell aktives Sheet im Browser öffnen |
+| `npm run open:script` | Apps Script Editor für aktuelles Projekt öffnen |
 
 ## Sheets
 
