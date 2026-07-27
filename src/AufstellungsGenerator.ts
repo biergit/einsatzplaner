@@ -328,15 +328,25 @@ function validateAufstellung(
     }
   }
 
+  let ersatzCount = 0;
   for (let ei = 0; ei < 3; ei++) {
     const eName = String(sheet.getRange(row, saisonErsatzCol(ei)).getValue() || '').trim();
-    if (eName) { ersatz++; einzel++; doppel++; }
+    if (eName) { ersatzCount++; }
   }
+
+  const f = SHEET_CONFIG.einstellungen.spielformat;
+  let missingEinzel = Math.max(0, f.einzel - einzel);
+  let missingDoppel = Math.max(0, f.doppel * 2 - doppel);
+  for (let i = 0; i < ersatzCount; i++) {
+    if (missingEinzel > 0) { einzel++; missingEinzel--; }
+    else if (missingDoppel > 0) { doppel++; missingDoppel--; }
+    else { einzel++; doppel++; }
+  }
+  ersatz = ersatzCount;
 
   const gesamt = einzel > doppel ? einzel : doppel;
   if (gesamt > 6) warnungen.push(`Mehr als 6 Spieler aufgestellt (${gesamt})`);
 
-  const f = SHEET_CONFIG.einstellungen.spielformat;
   if (einzel < f.einzel) warnungen.push(`Nur ${einzel}/${f.einzel} Einzel-Spieler`);
   if (einzel > f.einzel) warnungen.push(`Mehr als ${f.einzel} Einzel-Spieler (${einzel})`);
   if (doppel < f.doppel * 2) warnungen.push(`Nur ${doppel}/${f.doppel * 2} Doppel-Spieler`);

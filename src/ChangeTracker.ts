@@ -812,12 +812,20 @@ function computeHinweis(
   let ersatz = 0;
   for (let ei = 0; ei < 3; ei++) {
     if (String(sheet.getRange(row, saisonErsatzCol(ei)).getValue() || '').trim()) {
-      ersatz++; einzel++; doppel++;
+      ersatz++;
     }
   }
 
-  const gesamt = einzel > doppel ? einzel : doppel;
   const f = SHEET_CONFIG.einstellungen.spielformat;
+  let missingEinzel = Math.max(0, f.einzel - einzel);
+  let missingDoppel = Math.max(0, f.doppel * 2 - doppel);
+  for (let i = 0; i < ersatz; i++) {
+    if (missingEinzel > 0) { einzel++; missingEinzel--; }
+    else if (missingDoppel > 0) { doppel++; missingDoppel--; }
+    else { einzel++; doppel++; }
+  }
+
+  const gesamt = einzel > doppel ? einzel : doppel;
   if (gesamt > 6) warnungen.push(`Mehr als 6 Spieler aufgestellt (${gesamt})`);
   if (einzel < f.einzel) warnungen.push(`Nur ${einzel}/${f.einzel} Einzel-Spieler`);
   if (einzel > f.einzel) warnungen.push(`Mehr als ${f.einzel} Einzel-Spieler (${einzel})`);

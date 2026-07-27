@@ -17,8 +17,14 @@ function validateAufstellungLogic(
     else if (val === 'Doppel') doppel++;
   }
 
-  einzel += ersatzCount;
-  doppel += ersatzCount;
+  // Ersatz füllt zuerst fehlende Plätze auf
+  let missingEinzel = Math.max(0, einzelReq - einzel);
+  let missingDoppel = Math.max(0, doppelReq * 2 - doppel);
+  for (let i = 0; i < ersatzCount; i++) {
+    if (missingEinzel > 0) { einzel++; missingEinzel--; }
+    else if (missingDoppel > 0) { doppel++; missingDoppel--; }
+    else { einzel++; doppel++; }
+  }
 
   const gesamt = einzel > doppel ? einzel : doppel;
   if (gesamt > 6) warnungen.push(`Mehr als 6 Spieler aufgestellt (${gesamt})`);
@@ -54,17 +60,18 @@ describe('Aufstellung validation logic', () => {
     expect(w).toContain(`Nur 1/${D * 2} Doppel-Spieler`);
   });
 
-  it('1 Ersatzspieler zählt für beide', () => {
+  it('1 Ersatzspieler füllt zuerst Einzel-Lücke', () => {
     const w = validateAufstellungLogic(
       ['Einzel', 'Einzel', 'Einzel', 'Doppel', 'Doppel', 'Doppel'], 1, E, D
     );
-    expect(w).toHaveLength(0);
+    expect(w).toContain(`Nur 3/${D * 2} Doppel-Spieler`);
+    expect(w).not.toContain(`Nur ${E}/${E} Einzel-Spieler`);
   });
 
-  it('3 Ersatzspieler liefern 3 Einzel + 3 Doppel, Einzel braucht noch 1', () => {
+  it('3 Ersatzspieler füllen alle die Einzel-Lücke, Doppel bleibt leer', () => {
     const w = validateAufstellungLogic([], 3, E, D);
     expect(w).toContain(`Nur 3/${E} Einzel-Spieler`);
-    expect(w).toContain(`Nur 3/${D * 2} Doppel-Spieler`);
+    expect(w).toContain(`Nur 0/${D * 2} Doppel-Spieler`);
   });
 
   it('warns at 7 total players (6 Einzel+Doppel + 1 Ersatz)', () => {
