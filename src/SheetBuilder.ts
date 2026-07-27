@@ -12,15 +12,6 @@ const SHEET_NAMES = {
 const HEADER_COLOR = '#4A90D9';
 const HEADER_FONT_COLOR = '#FFFFFF';
 
-function deleteAllSheets(): void {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheets = ss.getSheets();
-  for (const sheet of sheets) {
-    ss.deleteSheet(sheet);
-  }
-  SpreadsheetApp.flush();
-}
-
 function getOrCreateSheet(name: string): GoogleAppsScript.Spreadsheet.Sheet {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const existing = ss.getSheetByName(name);
@@ -371,8 +362,6 @@ function pad(n: number): string {
 }
 
 function buildAllSheets(config: SheetConfig): void {
-  deleteAllSheets();
-
   buildDokumentationSheet(config.einstellungen);
   buildSpielerSheet(config);
   buildSpieltermineSheet(config);
@@ -380,6 +369,14 @@ function buildAllSheets(config: SheetConfig): void {
   buildAufstellungenSheet();
   buildAenderungslogSheet();
 
+  const knownNames: ReadonlySet<string> = new Set(Object.values(SHEET_NAMES));
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const allSheets = ss.getSheets();
+  for (const s of allSheets) {
+    if (!knownNames.has(s.getName())) {
+      ss.deleteSheet(s);
+    }
+  }
+
   ss.setActiveSheet(ss.getSheetByName(SHEET_NAMES.DOKUMENTATION)!);
 }
