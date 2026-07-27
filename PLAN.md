@@ -3,9 +3,9 @@
 ## Architektur
 
 ```
-data/*.tsv,json  ──build.py──►  dist/Config.js (überschreibt Defaults)
+data/*.tsv,json       ──build.py──►  dist/Config.js (überschreibt Defaults)
 test-data/*.tsv,json  ──build.py --data-dir test-data──►  dist/Config.js (Testdaten)
-                                      │
+                                              │
 src/*.ts  ──tsc──►  dist/*.js  ──clasp push──►  Google Apps Script
 ```
 
@@ -16,6 +16,34 @@ src/*.ts  ──tsc──►  dist/*.js  ──clasp push──►  Google Apps 
 - **`build.py`**: Liest `--data-dir` (default: `data/`) → generiert `dist/Config.js`
 
 `src/Config.ts` enthält leere Defaults und ist in Git getrackt. Bei `npm run build` wird es zuerst von `tsc` nach `dist/Config.js` kompiliert, dann überschreibt `build.py` die Datei mit den echten Daten aus `--data-dir`.
+
+## Deployment-Modell
+
+Zwei Google-Scripts (Produktiv und Test) mit separaten Script-IDs, verwaltet über zwei `.clasp.json`-Varianten:
+
+```
+┌─ deploy ──────────────┐    ┌─ deploy:test ───────────┐
+│ switch:prod            │    │ switch:test              │
+│   cp .clasp.json.prod  │    │   cp .clasp.json.test    │
+│   → .clasp.json        │    │   → .clasp.json          │
+│ build (data/)          │    │ build:test (test-data/)  │
+│ clasp push             │    │ clasp push               │
+└────────────────────────┘    └──────────────────────────┘
+```
+
+**Scripts:**
+
+| Script | Zweck |
+|--------|-------|
+| `npm run create` | Neues Sheet + Apps Script anlegen → `.clasp.json` |
+| `npm run save:prod` | `.clasp.json` → `.clasp.json.prod` |
+| `npm run save:test` | `.clasp.json` → `.clasp.json.test` |
+| `npm run switch:prod` | `.clasp.json.prod` → `.clasp.json` |
+| `npm run switch:test` | `.clasp.json.test` → `.clasp.json` |
+| `npm run deploy` | `switch:prod` + build + push |
+| `npm run deploy:test` | `switch:test` + build:test + push |
+
+Die `.clasp.json*`-Dateien sind alle gitignored (enthalten Google Script-IDs).
 
 ## Datenmodell
 

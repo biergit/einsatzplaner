@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .clasp.json
+.clasp.json.prod
+.clasp.json.test
 data/*
 !data/*.sample
 export/

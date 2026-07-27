@@ -23,30 +23,31 @@ Die Dateien im `data/`-Verzeichnis enthalten die Team-Daten (gitignored – kein
 
 Vorlagen liegen als `.sample`-Dateien im `data/`-Verzeichnis.
 
-### 3. Mit Google verbinden
+### 3. Google-Scripts einrichten
 
 ```bash
-npm run login       # Google-Login im Browser
-npm run create      # Erstellt Produktiv-Sheet + Apps Script
+npm run login               # Einmalig: Google-Login im Browser
+
+# Produktiv-Script
+npm run create              # Erstellt Sheet + Apps Script
+npm run save:prod           # Speichert Script-ID als Produktiv
+
+# Test-Script
+npm run create              # Erstellt zweites Sheet + Apps Script
+npm run save:test           # Speichert Script-ID als Test
 ```
+
+Die Script-IDs werden in `.clasp.json.prod` und `.clasp.json.test` abgelegt (beide gitignored).
 
 ### 4. Deployen
 
 ```bash
-npm run deploy      # Baut mit Produktivdaten + pushed zu Google
-npm run open        # Öffnet das Sheet im Browser
+npm run deploy              # Schaltet auf Produktiv → baut → pushed
+npm run deploy:test         # Schaltet auf Test → baut mit Testdaten → pushed
+npm run open               # Öffnet das aktuell aktive Sheet im Browser
 ```
 
-## Test-Build
-
-Für Tests ohne Produktivdaten liegt in `test-data/` ein Satz fiktiver Daten:
-
-```bash
-npm run create:test     # Einmalig: eigenes Test-Sheet anlegen
-npm run deploy:test     # Baut mit Testdaten + pushed
-```
-
-**Achtung:** Nach `create:test` ist die `.clasp.json` auf das Test-Script umgebogen. Für das Produktiv-Sheet wieder `npm run create` ausführen (oder `.clasp.json` manuell anpassen).
+`deploy` und `deploy:test` kümmern sich automatisch um das Umschalten des Script-Kontexts. Kein manuelles Kopieren nötig.
 
 ## Entwicklung
 
@@ -63,6 +64,17 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 - `npm run watch` – TypeScript-Watch-Modus
 - `npm test` – Build-Pipeline-Tests ausführen
 - `npm run test:watch` – Tests im Watch-Modus
+
+## Script-Verwaltung
+
+| Befehl | Beschreibung |
+|--------|-------------|
+| `npm run create` | Neues Sheet + Apps Script bei Google anlegen |
+| `npm run save:prod` | Aktuelle Script-ID als Produktiv sichern (`.clasp.json.prod`) |
+| `npm run save:test` | Aktuelle Script-ID als Test sichern (`.clasp.json.test`) |
+| `npm run switch:prod` | Auf Produktiv-Script umschalten |
+| `npm run switch:test` | Auf Test-Script umschalten |
+| `npm run open` | Aktuell aktives Sheet im Browser öffnen |
 
 ## Sheets
 
