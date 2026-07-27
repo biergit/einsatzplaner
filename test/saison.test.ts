@@ -23,7 +23,7 @@ function validateAufstellungLogic(
   const gesamt = einzel > doppel ? einzel : doppel;
   if (gesamt > 6) warnungen.push(`Mehr als 6 Spieler aufgestellt (${gesamt})`);
   if (einzel < einzelReq) warnungen.push(`Nur ${einzel}/${einzelReq} Einzel-Spieler`);
-  if (doppel < doppelReq) warnungen.push(`Nur ${doppel}/${doppelReq} Doppel-Spieler`);
+  if (doppel < doppelReq * 2) warnungen.push(`Nur ${doppel}/${doppelReq * 2} Doppel-Spieler`);
 
   return warnungen;
 }
@@ -49,20 +49,20 @@ describe('Aufstellung validation logic', () => {
     const w = validateAufstellungLogic(
       ['Einzel', 'Einzel', 'Einzel', 'Einzel', 'Doppel'], 0, E, D
     );
-    expect(w).toContain(`Nur 1/${D} Doppel-Spieler`);
+    expect(w).toContain(`Nur 1/${D * 2} Doppel-Spieler`);
   });
 
   it('1 Ersatzspieler zählt für beide', () => {
     const w = validateAufstellungLogic(
-      ['Einzel', 'Einzel', 'Einzel', 'Doppel'], 1, E, D
+      ['Einzel', 'Einzel', 'Einzel', 'Doppel', 'Doppel', 'Doppel'], 1, E, D
     );
     expect(w).toHaveLength(0);
   });
 
-  it('3 Ersatzspieler liefern 3 Einzel, brauchen noch 1 Kader-Einzel', () => {
+  it('3 Ersatzspieler liefern 3 Einzel + 3 Doppel, Einzel braucht noch 1', () => {
     const w = validateAufstellungLogic([], 3, E, D);
     expect(w).toContain(`Nur 3/${E} Einzel-Spieler`);
-    expect(w).not.toContain(`Nur 3/${D} Doppel-Spieler`); // Doppel: 3 ist ok
+    expect(w).toContain(`Nur 3/${D * 2} Doppel-Spieler`);
   });
 
   it('warns at 7 total players (6 Einzel+Doppel + 1 Ersatz)', () => {
@@ -82,7 +82,7 @@ describe('Aufstellung validation logic', () => {
   it('empty array → warns for both', () => {
     const w = validateAufstellungLogic([], 0, E, D);
     expect(w).toContain(`Nur 0/${E} Einzel-Spieler`);
-    expect(w).toContain(`Nur 0/${D} Doppel-Spieler`);
+    expect(w).toContain(`Nur 0/${D * 2} Doppel-Spieler`);
   });
 
   it('mixed types count correctly', () => {

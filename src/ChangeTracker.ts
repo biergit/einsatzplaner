@@ -166,7 +166,7 @@ function computeHinweis(
   const f = SHEET_CONFIG.einstellungen.spielformat;
   if (gesamt > 6) warnungen.push(`Mehr als 6 Spieler aufgestellt (${gesamt})`);
   if (einzel < f.einzel) warnungen.push(`Nur ${einzel}/${f.einzel} Einzel-Spieler`);
-  if (doppel < f.doppel) warnungen.push(`Nur ${doppel}/${f.doppel} Doppel-Spieler`);
+  if (doppel < f.doppel * 2) warnungen.push(`Nur ${doppel}/${f.doppel * 2} Doppel-Spieler`);
 
   return warnungen.join(' | ');
 }
