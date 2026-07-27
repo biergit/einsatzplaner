@@ -4,6 +4,7 @@
   "saisonBeginn": "2026-09-01",
   "saisonEnde": "2026-12-31",
   "debounceMinuten": 1,
+  "spieltage": [6],
   "spielformat": {
     "einzel": 4,
     "doppel": 2,

@@ -67,4 +67,8 @@ describe('generated Config.js', () => {
     expect(content).toContain('einzel: 4');
     expect(content).toContain('doppel: 2');
   });
+
+  it('contains spieltage config', () => {
+    expect(content).toContain('spieltage: [6]');
+  });
 });

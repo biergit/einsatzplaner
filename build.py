@@ -80,6 +80,7 @@ def read_einstellungen(data_dir: str) -> dict:
             "saisonBeginn": "2026-09-01",
             "saisonEnde": "2026-12-31",
             "debounceMinuten": 5,
+            "spieltage": [6],
             "spielformat": {"einzel": 4, "doppel": 2, "system": "Bundessystem"},
         }
     with open(path, encoding="utf-8") as f:
@@ -97,6 +98,8 @@ def generate_js(spieler, abwesenheiten, einstellungen) -> str:
     lines.append(f"    saisonEnde: new Date('{einstellungen['saisonEnde']}'),")
     debounce = einstellungen.get("debounceMinuten", 5)
     lines.append(f"    debounceMinuten: {debounce},")
+    spieltage = einstellungen.get("spieltage", [6])
+    lines.append(f"    spieltage: {json.dumps(spieltage)},")
     sf = einstellungen["spielformat"]
     lines.append("    spielformat: {")
     lines.append(f"      einzel: {sf['einzel']},")

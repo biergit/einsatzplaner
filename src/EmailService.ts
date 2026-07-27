@@ -6,7 +6,7 @@ interface EinsatzInfo {
   startzeit: string;
   heimAuswaerts: string;
   einsatzart: string;
-  notTop4: boolean;
+  besondereUnterstuetzung: boolean;
 }
 
 function sendEinsatzEmails(): void {
@@ -15,8 +15,7 @@ function sendEinsatzEmails(): void {
   if (!saisonSheet) return;
 
   const lastRow = saisonSheet.getLastRow();
-  const heute = new Date();
-  heute.setHours(0, 0, 0, 0);
+  const heute = new Date(); heute.setHours(0, 0, 0, 0);
 
   const spielerNames = readSpielerNames(ss);
   const aktiveSpieler = readAktiveSpieler(ss.getSheetByName(SHEET_NAMES.SPIELER)!);
@@ -29,61 +28,54 @@ function sendEinsatzEmails(): void {
   const einsaetzeProSpieler: Record<string, EinsatzInfo[]> = {};
   const ohneEmail: string[] = [];
 
-  const spielplan: string[] = [];
+  const spielplanRows: string[][] = [];
 
   for (let r = 0; r < dates.length; r++) {
     const datum = dates[r];
     if (!datum || datum < heute) continue;
-
     const row = r + 2;
+
     const status = String(saisonSheet.getRange(row, saisonStatusCol()).getValue() || '').trim();
     if (status !== 'Final') continue;
-
     const gegner = String(saisonSheet.getRange(row, saisonGegnerCol()).getValue() || '').trim();
     if (!gegner) continue;
 
-    const startzeit = String(saisonSheet.getRange(row, saisonStartzeitCol()).getValue() || '').trim();
+    const startVal = saisonSheet.getRange(row, saisonStartzeitCol()).getValue();
+    const startzeit = formatStartzeit(startVal);
+
     const heimAuswaerts = String(saisonSheet.getRange(row, saisonHeimAuswaertsCol()).getValue() || '').trim();
     const datumStr = Utilities.formatDate(datum, 'Europe/Berlin', 'dd.MM.yyyy');
+    const z = startzeit ? ` – ${startzeit}` : '';
 
     const key = dateKey(datum);
     const dayMap = allAbw.get(key);
-    const available = aktiveSpieler
-      .filter(s => {
-        const abw = dayMap?.get(s.name);
-        return !abw || !abw.startsWith('✗');
-      })
-      .sort((a, b) => a.rang - b.rang);
+    const available = aktiveSpieler.filter(s => {
+      const abw = dayMap?.get(s.name);
+      return !abw || !abw.startsWith('✗');
+    }).sort((a, b) => a.rang - b.rang);
     const top4Names = new Set(available.slice(0, 4).map(s => s.name));
 
-    const z = startzeit ? ` – ${startzeit}` : '';
-    spielplan.push(`${datumStr}${z}   ${heimAuswaerts}   ${gegner}`);
-
+    const matchPlayers: string[] = [];
     for (let pi = 0; pi < numPlayers; pi++) {
       const val = String(allPlayerCols[r][pi] || '').trim();
       if (!val || val.startsWith('✗')) continue;
-
       const name = spielerNames[pi];
-      const notTop4 = !top4Names.has(name);
-      const marker = notTop4 ? ' ★' : '';
-      spielplan.push(`  ${name}  →  ${val}${marker}`);
-
+      const bu = !top4Names.has(name);
+      matchPlayers.push(`${name} → ${val}${bu ? ' ★' : ''}`);
       if (!einsaetzeProSpieler[name]) einsaetzeProSpieler[name] = [];
-      einsaetzeProSpieler[name].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: val, notTop4 });
+      einsaetzeProSpieler[name].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: val, besondereUnterstuetzung: bu });
     }
 
     for (let ei = 0; ei < 3; ei++) {
       const eName = String(saisonSheet.getRange(row, saisonErsatzCol(ei)).getValue() || '').trim();
       if (!eName) continue;
-      spielplan.push(`  ${eName}  →  Einzel+Doppel (Ersatz)`);
+      matchPlayers.push(`${eName} → Einzel+Doppel (Ersatz)`);
       if (!einsaetzeProSpieler[eName]) einsaetzeProSpieler[eName] = [];
-      einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: 'Einzel+Doppel', notTop4: false });
+      einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: 'Einzel+Doppel', besondereUnterstuetzung: false });
     }
 
-    spielplan.push('');
+    spielplanRows.push([datumStr, z ? z : '', heimAuswaerts, gegner, matchPlayers.join('<br>')]);
   }
-
-  const gesamtspielplan = spielplan.join('\n');
 
   const spielerMap = buildSpielerMap();
 
@@ -93,88 +85,106 @@ function sendEinsatzEmails(): void {
       ohneEmail.push(spielerName);
       continue;
     }
-    sendEinsatzplanEmail(spieler, einsaetze, gesamtspielplan);
+    sendEinsatzplanEmail(spieler, einsaetze, spielplanRows);
   }
 
-  if (ohneEmail.length > 0) {
-    sendOhneEmailHinweis(ss, ohneEmail);
+  if (ohneEmail.length > 0) sendOhneEmailHinweis(ss, ohneEmail);
+}
+
+function formatStartzeit(val: unknown): string {
+  if (val instanceof Date) {
+    const h = val.getHours();
+    const m = val.getMinutes();
+    if (h === 0 && m === 0 && val.getFullYear() === 1899) return '';
+    return `${pad2(h)}:${pad2(m)}`;
   }
+  return '';
+}
+
+function buildHtmlTable(rows: string[][]): string {
+  if (rows.length === 0) return '';
+  let html = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;width:100%">';
+  html += '<tr style="background:#4A90D9;color:white"><th>Datum</th><th>Zeit</th><th>Ort</th><th>Gegner</th><th>Aufstellung</th></tr>';
+  for (const r of rows) {
+    const aufstellung = r[4].replace(/ ★/g, ' <span style="color:#B8860B;font-size:11px">★ besondere Unterstützung</span>');
+    html += `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td style="font-size:12px">${aufstellung}</td></tr>`;
+  }
+  html += '</table>';
+  return html;
 }
 
 function readSpielerNames(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string[] {
-  const spielerSheet = ss.getSheetByName(SHEET_NAMES.SPIELER);
-  if (!spielerSheet) return [];
-  const lastRow = spielerSheet.getLastRow();
-  if (lastRow <= 1) return [];
-  const data = spielerSheet.getRange(2, COL_SPIELER.Name, lastRow - 1, 1).getValues();
-  return data.map((r: unknown[]) => String(r[0]).trim()).filter((n: string) => n);
+  const s = ss.getSheetByName(SHEET_NAMES.SPIELER);
+  if (!s) return [];
+  const lr = s.getLastRow();
+  if (lr <= 1) return [];
+  return s.getRange(2, COL_SPIELER.Name, lr - 1, 1).getValues().map((r: unknown[]) => String(r[0]).trim()).filter((n: string) => n);
 }
 
 function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, namen: string[]): void {
-  const kapitaenEmail = getKapitaenEmail(ss);
-  if (!kapitaenEmail) return;
-
-  MailApp.sendEmail({
-    to: kapitaenEmail,
-    subject: 'Einsatzplaner – Spieler ohne E-Mail-Adresse',
-    body: `Hallo,\n\nDie Einsatzpläne wurden versendet. Folgende eingesetzte Spieler haben keine E-Mail-Adresse:\n\n${namen.map(n => `  – ${n}`).join('\n')}\n\nBitte kontaktiere sie direkt.\n\nDein Einsatzplaner-Team`,
-  });
+  const kap = getKapitaenEmail(ss);
+  if (!kap) return;
+  MailApp.sendEmail({ to: kap, subject: 'Einsatzplaner – Spieler ohne E-Mail-Adresse',
+    body: `Hallo,\n\nFolgende eingesetzte Spieler haben keine E-Mail-Adresse:\n\n${namen.map(n => `  – ${n}`).join('\n')}\n\nBitte kontaktiere sie direkt.\n\nDein Einsatzplaner-Team` });
 }
 
 function getKapitaenEmail(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string {
-  const spielerSheet = ss.getSheetByName(SHEET_NAMES.SPIELER);
-  if (!spielerSheet) return '';
-  const lastRow = spielerSheet.getLastRow();
-  if (lastRow <= 1) return '';
-  const data = spielerSheet.getRange(2, 1, lastRow - 1, COL_SPIELER.Rolle).getValues();
-  for (const row of data) {
-    const email = String(row[COL_SPIELER.Email - 1]).trim();
-    if (email && email.includes('@') && String(row[COL_SPIELER.Rolle - 1]).trim() === 'Kapitän') return email;
+  const s = ss.getSheetByName(SHEET_NAMES.SPIELER);
+  if (!s) return '';
+  const lr = s.getLastRow();
+  if (lr <= 1) return '';
+  const d = s.getRange(2, 1, lr - 1, COL_SPIELER.Rolle).getValues();
+  for (const r of d) {
+    if (String(r[COL_SPIELER.Email - 1]).includes('@') && String(r[COL_SPIELER.Rolle - 1]).trim() === 'Kapitän')
+      return String(r[COL_SPIELER.Email - 1]).trim();
   }
   return '';
 }
 
 function buildSpielerMap(): Record<string, Spieler> {
-  const map: Record<string, Spieler> = {};
+  const m: Record<string, Spieler> = {};
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const spielerSheet = ss.getSheetByName(SHEET_NAMES.SPIELER);
-  if (!spielerSheet) return map;
-  const lastRow = spielerSheet.getLastRow();
-  if (lastRow <= 1) return map;
-  const data = spielerSheet.getRange(2, 1, lastRow - 1, COL_SPIELER.Rolle).getValues();
-  for (const row of data) {
-    const name = String(row[COL_SPIELER.Name - 1]).trim();
-    const email = String(row[COL_SPIELER.Email - 1]).trim();
-    if (name) {
-      map[name] = {
-        name, email, rang: Number(row[COL_SPIELER.Rang - 1]) || 99,
-        aenderungenMelden: row[COL_SPIELER.AenderungenMelden - 1] === true,
-        rolle: '',
-      };
-    }
+  const s = ss.getSheetByName(SHEET_NAMES.SPIELER);
+  if (!s) return m;
+  const lr = s.getLastRow();
+  if (lr <= 1) return m;
+  const d = s.getRange(2, 1, lr - 1, COL_SPIELER.Rolle).getValues();
+  for (const r of d) {
+    const name = String(r[COL_SPIELER.Name - 1]).trim();
+    if (name) m[name] = { name, email: String(r[COL_SPIELER.Email - 1]).trim(),
+      rang: Number(r[COL_SPIELER.Rang - 1]) || 99,
+      aenderungenMelden: r[COL_SPIELER.AenderungenMelden - 1] === true, rolle: '' };
   }
-  return map;
+  return m;
 }
 
-function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], gesamtspielplan: string): void {
-  const termineStr = einsaetze
-    .sort((a, b) => a.datum.localeCompare(b.datum))
-    .map(e => {
-      const h = e.heimAuswaerts || '';
-      const z = e.startzeit ? ` – ${e.startzeit}` : '';
-      const marker = e.notTop4 ? ' ★' : '';
-      return `  ${e.datum}${z} – ${h} gegen ${e.gegner} (${e.einsatzart})${marker}`;
-    })
-    .join('\n');
+function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], spielplanRows: string[][]): void {
+  const htmlTable = buildHtmlTable(spielplanRows);
 
-  const body = `Hallo ${spieler.name},\n\n` +
-    `hier ist dein Einsatzplan (★ = außerhalb der Top 4):\n\n${termineStr}\n\n` +
-    `─── GESAMTSPIELPLAN ───\n\n${gesamtspielplan}\n\n` +
-    `Viele Grüße,\nDein Einsatzplaner-Team`;
+  let personliche = '';
+  for (const e of einsaetze.sort((a, b) => a.datum.localeCompare(b.datum))) {
+    const h = e.heimAuswaerts || '';
+    const z = e.startzeit ? ` – ${e.startzeit}` : '';
+    const bu = e.besondereUnterstuetzung ? ' ★' : '';
+    personliche += `<tr><td>${e.datum}${z}</td><td>${h}</td><td>${e.gegner}</td><td>${e.einsatzart}${bu}</td></tr>`;
+  }
+
+  const html = `<html><body style="font-family:Arial,sans-serif">
+<p>Hallo ${spieler.name},</p>
+<p>hier ist dein <b>persönlicher Einsatzplan</b>:</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px">
+<tr style="background:#4A90D9;color:white"><th>Datum / Zeit</th><th>Ort</th><th>Gegner</th><th>Einsatzart</th></tr>
+${personliche}
+</table>
+<p style="font-size:11px;color:#888">★ = besondere Unterstützung</p>
+<p>─── <b>GESAMTSPIELPLAN</b> ───</p>
+${htmlTable}
+<p>Viele Grüße,<br>Dein Einsatzplaner-Team</p>
+</body></html>`;
 
   MailApp.sendEmail({
     to: spieler.email,
     subject: 'Dein Einsatzplan – Tischtennis',
-    body: body,
+    htmlBody: html,
   });
 }

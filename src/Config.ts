@@ -7,6 +7,7 @@ const SHEET_CONFIG: SheetConfig = {
     saisonBeginn: new Date('2026-09-01'),
     saisonEnde: new Date('2026-12-31'),
     debounceMinuten: 5,
+    spieltage: [6],
     spielformat: {
       einzel: 4,
       doppel: 2,

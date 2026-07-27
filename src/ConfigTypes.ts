@@ -23,10 +23,11 @@ enum COL_AENDERUNGSLOG {
 }
 
 function saisonDatumCol(): number { return 1; }
-function saisonGegnerCol(): number { return 2; }
-function saisonStartzeitCol(): number { return 3; }
-function saisonHeimAuswaertsCol(): number { return 4; }
-function saisonSpielerColStart(): number { return 5; }
+function saisonWochentagCol(): number { return 2; }
+function saisonGegnerCol(): number { return 3; }
+function saisonStartzeitCol(): number { return 4; }
+function saisonHeimAuswaertsCol(): number { return 5; }
+function saisonSpielerColStart(): number { return 6; }
 
 function saisonSpielerCol(playerIndex: number): number {
   return saisonSpielerColStart() + playerIndex;
@@ -77,6 +78,7 @@ interface Einstellungen {
   saisonBeginn: Date;
   saisonEnde: Date;
   debounceMinuten: number;
+  spieltage: number[];
   spielformat: {
     einzel: number;
     doppel: number;
