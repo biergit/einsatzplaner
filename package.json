@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build": "tsc && cp appsscript.json dist/ && python3 build.py",
-    "build:test": "tsc && cp appsscript.json dist/ && python3 build.py --data-dir test",
+    "build:test": "tsc && cp appsscript.json dist/ && python3 build.py --data-dir test-data",
     "watch": "tsc --watch",
     "push": "clasp push",
     "deploy": "npm run build && clasp push",
@@ -13,7 +13,8 @@
     "login": "clasp login",
     "create": "clasp create --type sheets --title 'TT Einsatzplaner DEV' --rootDir ./dist",
     "create:test": "clasp create --type sheets --title 'TT Einsatzplaner TEST' --rootDir ./dist",
-    "open": "clasp open"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@google/clasp": "^3.3.0",
     "@types/google-apps-script": "^2.0.11",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   }
 }

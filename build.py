@@ -4,7 +4,7 @@
 
 Verwendung:
   python3 build.py                    # liest data/
-  python3 build.py --data-dir test    # liest test/
+  python3 build.py --data-dir test-data    # liest test-data/
 """
 
 import argparse

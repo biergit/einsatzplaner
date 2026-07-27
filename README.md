@@ -39,7 +39,7 @@ npm run open        # Öffnet das Sheet im Browser
 
 ## Test-Build
 
-Für Tests ohne Produktivdaten liegt in `test/` ein Satz fiktiver Daten:
+Für Tests ohne Produktivdaten liegt in `test-data/` ein Satz fiktiver Daten:
 
 ```bash
 npm run create:test     # Einmalig: eigenes Test-Sheet anlegen
@@ -54,13 +54,15 @@ npm run deploy:test     # Baut mit Testdaten + pushed
 src/           TypeScript-Quellcode (handgeschrieben)
 dist/          Kompilierte JS-Dateien + generierte Config (gitignored)
 data/          Produktivdaten (gitignored)
-test/          Testdaten – fiktiv, in Git getrackt
-build.py       Liest data/ oder test/ → generiert dist/Config.js
+test-data/     Testdaten – fiktiv, in Git getrackt
+build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 ```
 
 - `npm run build` – `tsc` + `build.py` (Produktivdaten)
-- `npm run build:test` – `tsc` + `build.py --data-dir test` (Testdaten)
+- `npm run build:test` – `tsc` + `build.py --data-dir test-data` (Testdaten)
 - `npm run watch` – TypeScript-Watch-Modus
+- `npm test` – Build-Pipeline-Tests ausführen
+- `npm run test:watch` – Tests im Watch-Modus
 
 ## Sheets
 

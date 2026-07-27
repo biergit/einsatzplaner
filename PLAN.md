@@ -4,7 +4,7 @@
 
 ```
 data/*.tsv,json  ──build.py──►  dist/Config.js (überschreibt Defaults)
-test/*.tsv,json  ──build.py --data-dir test──►  dist/Config.js (Testdaten)
+test-data/*.tsv,json  ──build.py --data-dir test-data──►  dist/Config.js (Testdaten)
                                       │
 src/*.ts  ──tsc──►  dist/*.js  ──clasp push──►  Google Apps Script
 ```
@@ -12,7 +12,7 @@ src/*.ts  ──tsc──►  dist/*.js  ──clasp push──►  Google Apps 
 - **`src/`**: Handgeschriebener TypeScript-Code (in Git)
 - **`dist/`**: Kompilierte + generierte JS-Dateien (gitignored)
 - **`data/`**: Produktivdaten (gitignored – sensible Daten)
-- **`test/`**: Testdaten (in Git – fiktive Daten)
+- **`test-data/`**: Testdaten (in Git – fiktive Daten)
 - **`build.py`**: Liest `--data-dir` (default: `data/`) → generiert `dist/Config.js`
 
 `src/Config.ts` enthält leere Defaults und ist in Git getrackt. Bei `npm run build` wird es zuerst von `tsc` nach `dist/Config.js` kompiliert, dann überschreibt `build.py` die Datei mit den echten Daten aus `--data-dir`.
@@ -94,6 +94,7 @@ enum COL_AENDERUNGSLOG { Zeitstempel = 1, Bereich = 2, AlterWert = 3, NeuerWert 
 | `src/EmailService.ts` | Einsatzplan-E-Mails + Kapitän-Hinweis |
 | `src/Main.ts` | onOpen-Menü, Menu-Handler |
 | `build.py` | Liest Daten → generiert `dist/Config.js` |
+| `test/build.test.ts` | Validiert Build-Pipeline und generierte Config.js |
 
 ## Roadmap
 
