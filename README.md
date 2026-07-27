@@ -18,7 +18,7 @@ Die Dateien im `data/`-Verzeichnis enthalten die Team-Daten (gitignored – kein
 |-------|--------|--------|
 | `spieler.tsv` | TSV | Name, Email, Rang, Änderungen melden, Rolle |
 | `abwesenheiten.tsv` | TSV | Spieler, Von, Bis, Kommentar |
-| `einstellungen.json` | JSON | teamName, saison, saisonBeginn, saisonEnde, debounceMinuten, spielformat |
+| `einstellungen.json` | JSON | teamName, saison, saisonBeginn, saisonEnde, debounceMinuten, spieltage, spielformat |
 
 Vorlagen liegen als `.sample`-Dateien im `data/`-Verzeichnis.
 
@@ -103,7 +103,7 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 | Menüpunkt | Beschreibung |
 |-----------|-------------|
 | Sheet neu aufbauen | Löscht alle Sheets und baut sie aus der Konfiguration neu auf. Löst **keine** E-Mail-Benachrichtigungen aus. |
-| Daten exportieren | Sichert alle Daten als JSON nach Google Drive |
+| Daten exportieren | Exportiert alle Rohdaten als TSV/JSON per E-Mail-Anhang |
 | Aufstellungen generieren | Füllt leere Aufstellungs-Zellen basierend auf Rang + Verfügbarkeit |
 | Finalisieren + Emails senden | Setzt Geplant→Final und versendet Einsatz-Mails |
 

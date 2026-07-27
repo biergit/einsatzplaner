@@ -26,7 +26,7 @@ function sendEinsatzEmails(): void {
   const allPlayerCols = saisonSheet.getRange(2, saisonSpielerCol(0), lastRow - 1, numPlayers).getValues() as string[][];
 
   const einsaetzeProSpieler: Record<string, EinsatzInfo[]> = {};
-  const ohneEmail: string[] = [];
+  const ohneEmail: { name: string; einsaetze: EinsatzInfo[] }[] = [];
 
   const spielplanRows: string[][] = [];
 
@@ -81,7 +81,7 @@ function sendEinsatzEmails(): void {
   for (const [spielerName, einsaetze] of Object.entries(einsaetzeProSpieler)) {
     const spieler = spielerMap[spielerName];
     if (!spieler || !spieler.email || !spieler.email.includes('@')) {
-      ohneEmail.push(spielerName);
+      ohneEmail.push({ name: spielerName, einsaetze });
       continue;
     }
     sendEinsatzplanEmail(spieler, einsaetze, spielplanRows);
@@ -125,11 +125,27 @@ function readSpielerNames(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string[
   return s.getRange(2, COL_SPIELER.Name, lr - 1, 1).getValues().map((r: unknown[]) => String(r[0]).trim()).filter((n: string) => n);
 }
 
-function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, namen: string[]): void {
+function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohneEmail: { name: string; einsaetze: EinsatzInfo[] }[]): void {
   const kap = getKapitaenEmail(ss);
   if (!kap) return;
-  MailApp.sendEmail({ to: kap, subject: 'Einsatzplaner – Spieler ohne E-Mail-Adresse',
-    body: `Hallo,\n\nFolgende eingesetzte Spieler haben keine E-Mail-Adresse:\n\n${namen.map(n => `  – ${n}`).join('\n')}\n\nBitte kontaktiere sie direkt.\n\nDein Einsatzplaner-Team` });
+
+  let body = 'Hallo,\n\n';
+  body += 'Es wurden soeben Spielpläne finalisiert und Einsatz-Mails verschickt.\n';
+  body += 'Folgende eingesetzte Spieler haben keine E-Mail-Adresse und konnten nicht automatisch benachrichtigt werden:\n\n';
+
+  for (const { name, einsaetze } of ohneEmail) {
+    body += `${name}:\n`;
+    for (const e of einsaetze.sort((a, b) => a.datum.localeCompare(b.datum))) {
+      const z = e.startzeit ? ` ${e.startzeit}` : '';
+      body += `  – ${e.datum}${z} (${e.heimAuswaerts ? e.heimAuswaerts + ' – ' : ''}${e.gegner})\n`;
+    }
+    body += '\n';
+  }
+
+  body += 'Bitte informiere sie persönlich über ihre Einsätze.\n\n';
+  body += 'Dein Einsatzplaner-Team';
+
+  MailApp.sendEmail({ to: kap, subject: 'Einsatzplaner – Spieler ohne E-Mail-Adresse', body });
 }
 
 function getKapitaenEmail(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string {
