@@ -231,7 +231,7 @@ function buildSaisonSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.She
 
   for (let i = 0; i < config.spieler.length; i++) {
     sheet.getRange(2, saisonSpielerCol(i), lastRow - 1, 1).setDataValidation(
-      SpreadsheetApp.newDataValidation().requireValueInList(ALLE_AUFSTELLUNGS_TYPEN).setAllowInvalid(false).build()
+      SpreadsheetApp.newDataValidation().requireValueInList(ALLE_AUFSTELLUNGS_TYPEN).setAllowInvalid(true).build()
     );
   }
 
@@ -284,6 +284,8 @@ function buildAllSheets(config: SheetConfig): void {
   buildAbwesenheitenSheet(config);
   buildSaisonSheet(config);
   buildAenderungslogSheet();
+
+  generateAufstellungen();
 
   const knownNames: ReadonlySet<string> = new Set(Object.values(SHEET_NAMES));
   const ss = SpreadsheetApp.getActiveSpreadsheet();
