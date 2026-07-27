@@ -35,10 +35,14 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     [`${einstellungen.teamName} – Saison ${einstellungen.saison}`, '', ''],
     ['', '', ''],
     ['SHEETS IM ÜBERBLICK', '', ''],
-    ['Spieler', 'Stammdaten', 'Name, Email, Rang, Aktiv, Änderungen melden, Rolle'],
-    ['Abwesenheiten', 'Von Spielern gepflegt', 'Spieler, Von, Bis, Kommentar'],
-    ['Saison', 'Zentrale Übersicht, ein Tag pro Zeile', 'Datum, Wochentag, Gegner, Startzeit, Heim/Auswärts, Spieler-Spalten, Ersatz, Status, Hinweis'],
-    ['Änderungslog', 'Automatisch (versteckt)', ''],
+    ['Spieler', 'Stammdaten', 'Name, Email, Rang, Aktiv, Aufstellungsänderungen melden, Rolle'],
+    ['Abwesenheiten', 'Von Spielern gepflegt', 'Spieler, Von, Bis, Kommentar, Hinweis (Validierung)'],
+    ['Saison', 'Zentrale Übersicht, ein Tag pro Zeile', 'Datum, Wochentag, Gegner, Startzeit, Heim/Auswärts, Spieler-Spalten, Ersatz, Status, Hinweis. Abwesende Spieler (✗) sind rot hinterlegt.'],
+    ['Änderungslog', 'Automatisch (versteckt)', 'Protokolliert alle Änderungen. Snapshot-Diff für Abwesenheiten/Spieler (Cut+Paste wird erkannt).'],
+    ['', '', ''],
+    ['SPIELER-SPALTEN', '', ''],
+    ['Aufstellungsänderungen melden', 'Checkbox', 'Bei gesetzter Checkbox: Über Aufstellungsänderungen der Mannschaft per E-Mail informieren.'],
+    ['Rolle', 'Dropdown', '"Kapitän" erhält Änderungs-Mails immer (auch ohne Checkbox).'],
     ['', '', ''],
     ['SAISON-SPALTEN', '', ''],
     ['Datum', 'Vorausgefüllt', ''],
@@ -53,19 +57,19 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['', '', ''],
     ['MENÜ', '', ''],
     ['Sheet neu aufbauen', 'Alles löschen und neu bauen', 'Keine E-Mails'],
-    ['Daten exportieren', 'JSON nach Google Drive', ''],
-    ['Aufstellungen generieren', 'Leere Zellen nach Rang + Verfügbarkeit füllen', 'Besondere Unterstützung (★) = nicht regular Top-4'],
+    ['Daten exportieren', 'Exportiert alle Rohdaten als TSV/JSON per E-Mail-Anhang', ''],
+    ['Aufstellungen generieren', 'Leere Zellen nach Rang + Verfügbarkeit füllen', 'Nicht-Stammspieler (gelb) = Rang > 4 oder Ersatzspieler'],
     ['Finalisieren + Emails senden', 'Geplant→Final, HTML-Mails an Spieler + Gesamtspielplan', ''],
     ['', '', ''],
     ['BENACHRICHTIGUNGEN', '', ''],
-    ['Änderungs-Mail', `Nach ${einstellungen.debounceMinuten} Min. an alle mit Haken`, 'Außer dem Bearbeiter selbst'],
-    ['Aufstellungs-Mail', 'HTML mit persönlichem Plan + Gesamtspielplan', 'Spieler ohne E-Mail → Kapitän-Hinweis'],
+    ['Änderungs-Mail', `Nach ${einstellungen.debounceMinuten} Min. an Kapitän (immer) + Checkbox-Inhaber`, 'Nur bei Saison-Änderungen (Aufstellung, Gegner, Startzeit, Status) und Abwesenheiten mit Spieltags-Bezug. Neue, nur geplante Spieltage lösen keine Mail aus.'],
+    ['Aufstellungs-Mail', 'HTML mit persönlichem Plan + Gesamtspielplan', 'Spieler ohne E-Mail → Kapitän-Hinweis mit Spieltag-Details. Ersatzspieler + Nicht-Stammspieler (Rang > 4) gelb hervorgehoben.'],
   ];
 
   const numCols = 3;
   sheet.getRange(1, 1, rows.length, numCols).setValues(rows);
   sheet.getRange(1, 1, 2, numCols).setFontWeight('bold').setFontSize(14).setBackground('#E8F0FE');
-  for (const r of [4, 10, 22, 26, 30]) {
+  for (const r of [4, 10, 14, 25, 31]) {
     sheet.getRange(r, 1, 1, numCols).setFontWeight('bold').setFontSize(11).setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
   }
   sheet.setFrozenRows(0);
@@ -74,7 +78,7 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
 
 function buildSpielerSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.Sheet {
   const sheet = getOrCreateSheet(SHEET_NAMES.SPIELER);
-  const headers = ['Name', 'Email', 'Rang', 'Aktiv', 'Änderungen melden', 'Rolle'];
+  const headers = ['Name', 'Email', 'Rang', 'Aktiv', 'Aufstellungsänderungen melden', 'Rolle'];
   const numCols = headers.length;
   sheet.getRange(1, 1, 1, numCols).setValues([headers]); formatHeader(sheet, numCols);
 
@@ -86,7 +90,7 @@ function buildSpielerSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.Sh
 
   sheet.setColumnWidth(COL_SPIELER.Name, 200); sheet.setColumnWidth(COL_SPIELER.Email, 280);
   sheet.setColumnWidth(COL_SPIELER.Rang, 60); sheet.setColumnWidth(COL_SPIELER.Aktiv, 60);
-  sheet.setColumnWidth(COL_SPIELER.AenderungenMelden, 140); sheet.setColumnWidth(COL_SPIELER.Rolle, 100);
+  sheet.setColumnWidth(COL_SPIELER.AenderungenMelden, 240); sheet.setColumnWidth(COL_SPIELER.Rolle, 100);
 
   const lastRow = Math.max(sheet.getMaxRows() - 1, config.spieler.length + 50);
   sheet.getRange(2, COL_SPIELER.Rang, lastRow, 1).setDataValidation(
@@ -104,7 +108,7 @@ function buildSpielerSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.Sh
 
 function buildAbwesenheitenSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.Sheet {
   const sheet = getOrCreateSheet(SHEET_NAMES.ABWESENHEITEN);
-  const headers = ['Spieler', 'Abwesenheit von', 'Abwesenheit bis', 'Kommentar'];
+  const headers = ['Spieler', 'Abwesenheit von', 'Abwesenheit bis', 'Kommentar', 'Hinweis'];
   const numCols = headers.length;
   sheet.getRange(1, 1, 1, numCols).setValues([headers]); formatHeader(sheet, numCols);
 
@@ -115,12 +119,14 @@ function buildAbwesenheitenSheet(config: SheetConfig): GoogleAppsScript.Spreadsh
         `${pad(a.von.getDate())}.${pad(a.von.getMonth() + 1)}.${a.von.getFullYear()}`,
         `${pad(a.bis.getDate())}.${pad(a.bis.getMonth() + 1)}.${a.bis.getFullYear()}`,
         a.kommentar,
+        '',
       ])
     );
   }
 
   sheet.setColumnWidth(COL_ABWESENHEITEN.Spieler, 200); sheet.setColumnWidth(COL_ABWESENHEITEN.Von, 140);
   sheet.setColumnWidth(COL_ABWESENHEITEN.Bis, 140); sheet.setColumnWidth(COL_ABWESENHEITEN.Kommentar, 350);
+  sheet.setColumnWidth(COL_ABWESENHEITEN.Hinweis, 300);
 
   const lastRow = sheet.getMaxRows() - 1;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -136,10 +142,6 @@ function buildAbwesenheitenSheet(config: SheetConfig): GoogleAppsScript.Spreadsh
   }
 
   sheet.getRange(2, COL_ABWESENHEITEN.Von, lastRow, 2).setNumberFormat('DD.MM.YYYY');
-  sheet.setConditionalFormatRules([
-    SpreadsheetApp.newConditionalFormatRule().whenTextContains('muss').setBackground('#FFF2CC')
-      .setRanges([sheet.getRange(1, COL_ABWESENHEITEN.Kommentar, sheet.getMaxRows(), 1)]).build(),
-  ]);
   sheet.setFrozenRows(1);
   return sheet;
 }
@@ -189,6 +191,41 @@ function buildSaisonSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.She
   sheet.getRange(2, saisonStatusCol(), lastRow - 1, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInList(['Geplant', 'Final']).setAllowInvalid(true).build());
 
+  const cfRules: GoogleAppsScript.Spreadsheet.ConditionalFormatRule[] = [];
+  const firstPlayerCol = saisonSpielerCol(0);
+
+  // Ersatzspieler-Spalten: gelb nur wenn Zelle gefüllt ist
+  cfRules.push(
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(`=${colLetter(saisonErsatzCol(0))}2<>""`)
+      .setBackground('#FFF7E0')
+      .setRanges([sheet.getRange(2, saisonErsatzCol(0), lastRow - 1, 3)])
+      .build(),
+  );
+
+  // Rang > 4 Spieler-Spalten: gelb wenn Aufstellung eingetragen
+  for (let i = 0; i < config.spieler.length; i++) {
+    if (config.spieler[i].rang > 4) {
+      const col = saisonSpielerCol(i);
+      cfRules.push(
+        SpreadsheetApp.newConditionalFormatRule()
+          .whenFormulaSatisfied(`=${colLetter(col)}2<>""`)
+          .setBackground('#FFF7E0')
+          .setRanges([sheet.getRange(2, col, lastRow - 1, 1)])
+          .build(),
+      );
+    }
+  }
+
+  // ✗-Zellen in allen Spieler-Spalten rot hinterlegen (letzte Regel → höchste visuelle Priorität)
+  cfRules.push(
+    SpreadsheetApp.newConditionalFormatRule().whenTextStartsWith('✗').setBackground('#F4CCCC')
+      .setRanges([sheet.getRange(2, firstPlayerCol, lastRow - 1,
+        saisonSpielerCol(config.spieler.length - 1) - firstPlayerCol + 1)]).build(),
+  );
+
+  sheet.setConditionalFormatRules(cfRules);
+
   const filterRange = sheet.getRange(1, 1, lastRow, numCols);
   if (filterRange.getFilter()) filterRange.getFilter()!.remove();
 
@@ -219,6 +256,16 @@ function buildAenderungslogSheet(): GoogleAppsScript.Spreadsheet.Sheet {
 }
 
 function pad(n: number): string { return n.toString().padStart(2, '0'); }
+
+function colLetter(col: number): string {
+  let s = '';
+  while (col > 0) {
+    col--;
+    s = String.fromCharCode(65 + (col % 26)) + s;
+    col = Math.floor(col / 26);
+  }
+  return s;
+}
 
 function buildAllSheets(config: SheetConfig): void {
   buildDokumentationSheet(config.einstellungen);

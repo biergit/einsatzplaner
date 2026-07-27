@@ -16,7 +16,7 @@ Die Dateien im `data/`-Verzeichnis enthalten die Team-Daten (gitignored – kein
 
 | Datei | Format | Inhalt |
 |-------|--------|--------|
-| `spieler.tsv` | TSV | Name, Email, Rang, Änderungen melden, Rolle |
+| `spieler.tsv` | TSV | Name, Email, Rang, Aufstellungsänderungen melden, Rolle |
 | `abwesenheiten.tsv` | TSV | Spieler, Von, Bis, Kommentar |
 | `einstellungen.json` | JSON | teamName, saison, saisonBeginn, saisonEnde, debounceMinuten, spieltage, spielformat |
 
@@ -93,9 +93,9 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 | Sheet | Zweck |
 |-------|-------|
 | **Dokumentation** | Erläuterung aller Spalten, Funktionen und des Workflows |
-| **Spieler** | Name, Email (optional), Rang, Aktiv, Änderungen melden, Rolle |
+| **Spieler** | Name, Email (optional), Rang, Aktiv, Aufstellungsänderungen melden, Rolle |
 | **Abwesenheiten** | Spieler, Von, Bis, Kommentar |
-| **Saison** | Zentrale Übersicht: jeder Tag eine Zeile, Spieltage mit Gegner/Aufstellung, Spieler-Anwesenheit per Formel |
+| **Saison** | Zentrale Übersicht: jeder Tag eine Zeile, Spieltage mit Gegner/Aufstellung. Abwesende Spieler (✗) sind rot hinterlegt. |
 | **Änderungslog** | Automatisches Protokoll aller Änderungen (versteckt) |
 
 ## Menü-Funktionen
@@ -110,7 +110,11 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 ## Automatische Benachrichtigungen
 
 - Bei jeder Bearbeitung durch ein Teammitglied wird die Änderung protokolliert
-- Nach einer konfigurierbaren Zeitspanne ohne weitere Änderung (`debounceMinuten` in `einstellungen.json`) erhalten alle Spieler mit Checkbox **Änderungen melden** eine E-Mail mit den letzten Änderungen – außer sie waren selbst die Bearbeiter
+- Nach einer konfigurierbaren Zeitspanne ohne weitere Änderung (`debounceMinuten` in `einstellungen.json`) wird eine HTML-Änderungsmail versendet
+- Empfänger: **Kapitän** (immer) sowie alle Spieler mit Checkbox **Aufstellungsänderungen melden** – außer sie waren selbst die Bearbeiter
+- Abwesenheits-Änderungen lösen nur dann eine Mail aus, wenn sie einen geplanten oder finalen Spieltag betreffen
+- Saison-Änderungen werden nach Spieltag gruppiert mit Vorher-/Nachher-Vergleich dargestellt (rote Markierung für entfernte Werte, grün für neue/geänderte)
+- Neue, nur geplante (nicht finalisierte) Spieltage lösen keine Benachrichtigung aus
 - Der Bearbeiter wird anhand seiner Google-Account-E-Mail identifiziert
 - Änderungen am Dokumentation- und Änderungslog-Sheet lösen keine Benachrichtigung aus
 - Der Neuaufbau des Sheets (Menü → Sheet neu aufbauen) löst keine Benachrichtigungen aus
@@ -119,9 +123,9 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 
 | Rolle | Bedeutung |
 |-------|-----------|
-| `Kapitän` | Bekommt nach dem E-Mail-Versand einen Hinweis über eingesetzte Spieler ohne E-Mail-Adresse |
-| *(leer)* | Normales Teammitglied |
+| `Kapitän` | Erhält Änderungs-Mails immer (auch ohne Checkbox). Bekommt nach dem E-Mail-Versand einen Hinweis über eingesetzte Spieler ohne E-Mail-Adresse |
+| *(leer)* | Normales Teammitglied – erhält Änderungs-Mails nur bei gesetzter Checkbox |
 
 ## Spieler ohne E-Mail
 
-E-Mail-Adressen sind optional. Hat ein eingesetzter Spieler keine E-Mail hinterlegt, bekommt der Kapitän nach dem Versand der Einsatzpläne eine separate Nachricht mit der Liste dieser Spieler – damit er sie persönlich kontaktieren kann.
+E-Mail-Adressen sind optional. Hat ein eingesetzter Spieler keine E-Mail hinterlegt, bekommt der Kapitän nach dem Versand der Einsatzpläne eine separate Nachricht mit der Liste dieser Spieler und ihren konkreten Spieltagen – damit er sie persönlich kontaktieren kann.

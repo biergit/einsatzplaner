@@ -66,6 +66,8 @@ function menuFinalisierenUndSenden(): void {
   );
   if (antwort !== ui.Button.YES) return;
 
+  PropertiesService.getScriptProperties().setProperty('SUPPRESS_NOTIFICATION', 'true');
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const saisonSheet = ss.getSheetByName(SHEET_NAMES.SAISON);
   if (!saisonSheet) {
@@ -92,4 +94,8 @@ function menuFinalisierenUndSenden(): void {
   } catch (e) {
     ui.alert('Fehler', `Finalisierung ok (${count} Termine), aber E-Mail-Versand fehlgeschlagen:\n${e}`, ui.ButtonSet.OK);
   }
+}
+
+function autorisiere(): void {
+  ScriptApp.getProjectTriggers();
 }

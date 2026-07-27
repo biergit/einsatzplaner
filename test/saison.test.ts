@@ -23,7 +23,9 @@ function validateAufstellungLogic(
   const gesamt = einzel > doppel ? einzel : doppel;
   if (gesamt > 6) warnungen.push(`Mehr als 6 Spieler aufgestellt (${gesamt})`);
   if (einzel < einzelReq) warnungen.push(`Nur ${einzel}/${einzelReq} Einzel-Spieler`);
+  if (einzel > einzelReq) warnungen.push(`Mehr als ${einzelReq} Einzel-Spieler (${einzel})`);
   if (doppel < doppelReq * 2) warnungen.push(`Nur ${doppel}/${doppelReq * 2} Doppel-Spieler`);
+  if (doppel > doppelReq * 2) warnungen.push(`Mehr als ${doppelReq * 2} Doppel-Spieler (${doppel})`);
 
   return warnungen;
 }
@@ -90,5 +92,27 @@ describe('Aufstellung validation logic', () => {
       ['Einzel+Doppel', 'Einzel+Doppel', 'Einzel', 'Einzel', 'Doppel', 'Doppel'], 0, E, D
     );
     expect(w).toHaveLength(0);
+  });
+
+  it('warns when too many Einzel', () => {
+    const w = validateAufstellungLogic(
+      ['Einzel+Doppel', 'Einzel+Doppel', 'Einzel+Doppel', 'Einzel+Doppel', 'Einzel'], 0, E, D
+    );
+    expect(w).toContain(`Mehr als ${E} Einzel-Spieler (5)`);
+  });
+
+  it('warns when too many Doppel', () => {
+    const w = validateAufstellungLogic(
+      ['Einzel+Doppel', 'Einzel+Doppel', 'Einzel+Doppel', 'Einzel+Doppel', 'Doppel'], 0, E, D
+    );
+    expect(w).toContain(`Mehr als ${D * 2} Doppel-Spieler (5)`);
+  });
+
+  it('1 Ersatz with 4 Einzel+Doppel → warns too many Einzel and Doppel', () => {
+    const w = validateAufstellungLogic(
+      ['Einzel+Doppel', 'Einzel+Doppel', 'Einzel+Doppel', 'Einzel+Doppel'], 1, E, D
+    );
+    expect(w).toContain(`Mehr als ${E} Einzel-Spieler (5)`);
+    expect(w).toContain(`Mehr als ${D * 2} Doppel-Spieler (5)`);
   });
 });

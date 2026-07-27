@@ -60,7 +60,11 @@ function sendEinsatzEmails(): void {
       if (!val || val.startsWith('✗')) continue;
       const name = spielerNames[pi];
       const bu = !top4Names.has(name);
-      matchPlayers.push(`${name} → ${val}${bu ? ' ★' : ''}`);
+      if (bu) {
+        matchPlayers.push(`<span style="background:#FFF7E0;padding:1px 4px">${name} → ${val}</span>`);
+      } else {
+        matchPlayers.push(`${name} → ${val}`);
+      }
       if (!einsaetzeProSpieler[name]) einsaetzeProSpieler[name] = [];
       einsaetzeProSpieler[name].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: val, besondereUnterstuetzung: bu });
     }
@@ -68,7 +72,7 @@ function sendEinsatzEmails(): void {
     for (let ei = 0; ei < 3; ei++) {
       const eName = String(saisonSheet.getRange(row, saisonErsatzCol(ei)).getValue() || '').trim();
       if (!eName) continue;
-      matchPlayers.push(`${eName} → Einzel+Doppel (Ersatz)`);
+      matchPlayers.push(`<span style="background:#FFF7E0;padding:1px 4px">${eName} → Einzel+Doppel (Ersatz)</span>`);
       if (!einsaetzeProSpieler[eName]) einsaetzeProSpieler[eName] = [];
       einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: 'Einzel+Doppel', besondereUnterstuetzung: false });
     }
@@ -97,23 +101,23 @@ function formatStartzeit(val: unknown): string {
     if (h === 0 && m === 0 && val.getFullYear() === 1899) return '';
     return `${pad2(h)}:${pad2(m)}`;
   }
+  if (typeof val === 'number' && val > 0 && val < 24) {
+    const h = Math.floor(val);
+    const m = Math.round((val - h) * 60);
+    return `${pad2(h)}:${pad2(m)}`;
+  }
   return '';
 }
 
-function buildHtmlTable(rows: string[][], hasBu: boolean): string {
+function buildHtmlTable(rows: string[][]): string {
   if (rows.length === 0) return '';
   let html = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px;width:100%">';
   html += '<tr style="background:#4A90D9;color:white"><th>Datum</th><th>Zeit</th><th>Ort</th><th>Gegner</th><th>Aufstellung</th></tr>';
   for (const r of rows) {
-    const aufstellung = r[4]
-      .replace(/ ★/g, ' <span style="color:#B8860B;font-size:12px">★</span>')
-      .replace(/→/g, '—');
+    const aufstellung = r[4].replace(/→/g, '—');
     html += `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td style="font-size:14px">${aufstellung}</td></tr>`;
   }
   html += '</table>';
-  if (hasBu) {
-    html += '<p style="font-size:12px;color:#888">★ = besondere Unterstützung</p>';
-  }
   return html;
 }
 
@@ -179,20 +183,14 @@ function buildSpielerMap(): Record<string, Spieler> {
 }
 
 function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], spielplanRows: string[][]): void {
-  const hasBu = einsaetze.some(e => e.besondereUnterstuetzung);
-  const htmlTable = buildHtmlTable(spielplanRows, hasBu);
+  const htmlTable = buildHtmlTable(spielplanRows);
 
   let personliche = '';
   for (const e of einsaetze.sort((a, b) => a.datum.localeCompare(b.datum))) {
     const h = e.heimAuswaerts || '';
     const z = e.startzeit ? ` ${e.startzeit}` : '';
-    const bu = e.besondereUnterstuetzung ? ' ★' : '';
-    personliche += `<tr><td>${e.datum}${z}</td><td>${h}</td><td>${e.gegner}</td><td>${e.einsatzart}${bu}</td></tr>`;
-  }
-
-  let legende = '';
-  if (hasBu) {
-    legende = '<p style="font-size:12px;color:#888">★ = besondere Unterstützung</p>';
+    const style = e.besondereUnterstuetzung ? ' style="background:#FFF7E0"' : '';
+    personliche += `<tr${style}><td>${e.datum}${z}</td><td>${h}</td><td>${e.gegner}</td><td>${e.einsatzart}</td></tr>`;
   }
 
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:14px">
@@ -202,7 +200,6 @@ function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], spielp
 <tr style="background:#4A90D9;color:white"><th>Datum / Zeit</th><th>Ort</th><th>Gegner</th><th>Einsatzart</th></tr>
 ${personliche}
 </table>
-${legende}
 <p>─── <b>GESAMTSPIELPLAN</b> ───</p>
 ${htmlTable}
 <p>Viele Grüße,<br>Dein Einsatzplaner-Team</p>

@@ -45,8 +45,7 @@ function buildAbwesenheitenIndex(
     const end = new Date(bis);
     end.setHours(0, 0, 0, 0);
 
-    const isHard = !kommentar.toLowerCase().includes('muss');
-    const display = isHard ? `✗ ${kommentar || 'abwesend'}` : kommentar;
+    const display = `✗ ${kommentar || 'abwesend'}`;
 
     while (cursor <= end) {
       const key = dateKey(cursor);
@@ -339,7 +338,9 @@ function validateAufstellung(
 
   const f = SHEET_CONFIG.einstellungen.spielformat;
   if (einzel < f.einzel) warnungen.push(`Nur ${einzel}/${f.einzel} Einzel-Spieler`);
-  if (doppel < f.doppel) warnungen.push(`Nur ${doppel}/${f.doppel} Doppel-Spieler`);
+  if (einzel > f.einzel) warnungen.push(`Mehr als ${f.einzel} Einzel-Spieler (${einzel})`);
+  if (doppel < f.doppel * 2) warnungen.push(`Nur ${doppel}/${f.doppel * 2} Doppel-Spieler`);
+  if (doppel > f.doppel * 2) warnungen.push(`Mehr als ${f.doppel * 2} Doppel-Spieler (${doppel})`);
 
   return { einzelCount: einzel, doppelCount: doppel, ersatzCount: ersatz, gesamtCount: gesamt, warnungen };
 }

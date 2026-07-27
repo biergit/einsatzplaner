@@ -12,6 +12,7 @@ enum COL_ABWESENHEITEN {
   Von = 2,
   Bis = 3,
   Kommentar = 4,
+  Hinweis = 5,
 }
 
 enum COL_AENDERUNGSLOG {

@@ -48,10 +48,10 @@ Die `.clasp.json*`-Dateien sind alle gitignored (enthalten Google Script-IDs).
 ## Datenmodell
 
 ### Spieler (`COL_SPIELER`)
-Name, Email (optional), Rang (1-N), Aktiv (Checkbox), Änderungen melden (Checkbox), Rolle (`Kapitän` oder leer)
+Name, Email (optional), Rang (1-N), Aktiv (Checkbox), Aufstellungsänderungen melden (Checkbox), Rolle (`Kapitän` oder leer)
 
 ### Abwesenheiten (`COL_ABWESENHEITEN`)
-Spieler (Dropdown aus Spieler), Von, Bis, Kommentar
+Spieler (Dropdown aus Spieler), Von, Bis, Kommentar, Hinweis (automatische Validierung)
 
 ### Spieltermine (`COL_SPIELTERMINE`)
 Datum, Heim/Gast (Dropdown), Gegner, Ort (optional), Status (Geplant/Finalisiert/Versendet)
@@ -68,20 +68,23 @@ Zeitstempel, Bereich, Alter Wert, Neuer Wert, Bearbeiter
 2. Abwesenheiten für das Datum prüfen → verfügbare Spieler
 3. Top-4 verfügbare → Positionen Einzel 1-4
 4. Zwei Doppel-Zeilen mit Vorschlägen aus den verfügbaren Spielern
-5. "nur wenn es sein muss"-Hinweise werden als separate Zeile ausgegeben
-6. Der Kapitän kann die Aufstellung danach manuell anpassen
+5. Der Kapitän kann die Aufstellung danach manuell anpassen
 
 ## Benachrichtigungslogik
 
 ### Änderungs-Benachrichtigung (ChangeTracker)
 
-1. `onEdit` triggert bei jeder Bearbeitung
+1. `onEdit` (nur installierbarer Trigger mit `authMode === FULL`) triggert bei jeder Bearbeitung
 2. Falls `SHEET_BUILDER_RUNNING`-Flag gesetzt → Abbruch (keine Logs/Emails beim Sheet-Neuaufbau)
-3. Bearbeitungen an Dokumentation, Aufstellungen und Änderungslog werden ignoriert
-4. Änderung wird ins Änderungslog geschrieben
+3. Bearbeitungen an Dokumentation und Änderungslog werden ignoriert
+4. Änderungen werden im Debounce-Puffer (`PENDING_EDITS` in ScriptProperties) gesammelt
 5. Debounce-Timer (konfigurierbar via `einstellungen.debounceMinuten`) wird zurückgesetzt
-6. Nach Ablauf: Alle Benutzer mit Checkbox "Änderungen melden" bekommen E-Mail
-7. Der Bearbeiter selbst wird aus der Empfängerliste ausgeschlossen (via Google-Account-E-Mail)
+6. Nach Ablauf: Snapshot-Diff für Abwesenheiten und Spieler, Saison-Pending-Edits direkt
+7. Alle Einträge werden ins Änderungslog geschrieben (permanent, ungefiltert)
+8. HTML-Mail an Kapitän (immer) + Spieler mit Checkbox "Aufstellungsänderungen melden"
+   - Außer dem Bearbeiter selbst
+   - Abwesenheits-Änderungen nur wenn geplante/finale Spieltage betroffen sind
+   - Saison-Änderungen nach Spieltag gruppiert mit Vorher-/Nachher-Vergleich
 
 ### Einsatzplan-E-Mails (EmailService)
 
@@ -94,8 +97,8 @@ Zeitstempel, Bereich, Alter Wert, Neuer Wert, Bearbeiter
 
 | Rolle | Beschreibung |
 |-------|-------------|
-| `Kapitän` | Erhält Hinweis über eingesetzte Spieler ohne E-Mail-Adresse |
-| *(leer)* | Normales Teammitglied, keine Sonderfunktion |
+| `Kapitän` | Erhält Änderungs-Mails immer (auch ohne Checkbox). Erhält Hinweis über eingesetzte Spieler ohne E-Mail-Adresse |
+| *(leer)* | Normales Teammitglied, erhält Änderungs-Mails nur bei gesetzter Checkbox |
 
 Die Rolle ist unabhängig von der Checkbox "Änderungen melden" – ein Spieler kann beides haben, nur eines oder keines.
 
@@ -105,7 +108,7 @@ Alle Sheet-Zugriffe verwenden `COL_*`-Enums aus `ConfigTypes.ts` statt Magic Num
 
 ```typescript
 enum COL_SPIELER { Name = 1, Email = 2, Rang = 3, Aktiv = 4, AenderungenMelden = 5, Rolle = 6 }
-enum COL_ABWESENHEITEN { Spieler = 1, Von = 2, Bis = 3, Kommentar = 4 }
+enum COL_ABWESENHEITEN { Spieler = 1, Von = 2, Bis = 3, Kommentar = 4, Hinweis = 5 }
 enum COL_SPIELTERMINE { Datum = 1, HeimGast = 2, Gegner = 3, Ort = 4, Status = 5 }
 enum COL_AUFSTELLUNGEN { Termin = 1, Typ = 2, Spieler = 3 }
 enum COL_AENDERUNGSLOG { Zeitstempel = 1, Bereich = 2, AlterWert = 3, NeuerWert = 4, Bearbeiter = 5 }
