@@ -22,28 +22,34 @@ enum COL_AENDERUNGSLOG {
   Bearbeiter = 5,
 }
 
-function saisonMaxSlots(): number {
-  return SHEET_CONFIG.einstellungen.spielformat.einzel + SHEET_CONFIG.einstellungen.spielformat.doppel;
+function saisonDatumCol(): number { return 1; }
+function saisonGegnerCol(): number { return 2; }
+function saisonStartzeitCol(): number { return 3; }
+function saisonHeimAuswaertsCol(): number { return 4; }
+function saisonSpielerColStart(): number { return 5; }
+
+function saisonSpielerCol(playerIndex: number): number {
+  return saisonSpielerColStart() + playerIndex;
 }
 
-function saisonEinsatzartCol(slotIndex: number): number {
-  return 5 + slotIndex * 2;
+function saisonErsatzColStart(): number {
+  return saisonSpielerColStart() + SHEET_CONFIG.spieler.length;
 }
 
-function saisonSpielerCol(slotIndex: number): number {
-  return 6 + slotIndex * 2;
+function saisonErsatzCol(index: number): number {
+  return saisonErsatzColStart() + index;
 }
 
 function saisonStatusCol(): number {
-  return 5 + saisonMaxSlots() * 2;
+  return saisonErsatzColStart() + 3;
 }
 
 function saisonHinweisCol(): number {
   return saisonStatusCol() + 1;
 }
 
-function saisonErsterSpielerCol(): number {
-  return saisonHinweisCol() + 1;
+function saisonColCount(): number {
+  return saisonHinweisCol();
 }
 
 interface Spieler {
@@ -63,7 +69,7 @@ interface Abwesenheit {
 
 type AufstellungsTyp = 'Einzel+Doppel' | 'Einzel' | 'Doppel';
 
-type AufstellungStatus = 'Geplant' | 'Final';
+const ALLE_AUFSTELLUNGS_TYPEN: AufstellungsTyp[] = ['Einzel+Doppel', 'Einzel', 'Doppel'];
 
 interface Einstellungen {
   teamName: string;
@@ -82,4 +88,14 @@ interface SheetConfig {
   spieler: Spieler[];
   abwesenheiten: Abwesenheit[];
   einstellungen: Einstellungen;
+}
+
+type AufstellungsZelle = AufstellungsTyp | '';
+
+interface SaisonValidierung {
+  einzelCount: number;
+  doppelCount: number;
+  ersatzCount: number;
+  gesamtCount: number;
+  warnungen: string[];
 }

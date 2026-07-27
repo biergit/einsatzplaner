@@ -7,115 +7,149 @@ function generateAufstellungen(): void {
   const saisonSheet = ss.getSheetByName(SHEET_NAMES.SAISON);
 
   if (!spielerSheet || !abwesenheitenSheet || !saisonSheet) {
-    SpreadsheetApp.getUi().alert('Fehler', 'Nicht alle benötigten Sheets sind vorhanden.', SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('Fehler', 'Nicht alle Sheets vorhanden.', SpreadsheetApp.getUi().ButtonSet.OK);
     return;
   }
 
   const aktiveSpieler = readAktiveSpieler(spielerSheet);
   const lastRow = saisonSheet.getLastRow();
-  const maxSlots = saisonMaxSlots();
+
+  fillPlayerPresence(saisonSheet, abwesenheitenSheet, aktiveSpieler, lastRow);
 
   for (let row = 2; row <= lastRow; row++) {
-    const gegner = String(saisonSheet.getRange(row, 2).getValue() || '').trim();
+    const gegner = String(saisonSheet.getRange(row, saisonGegnerCol()).getValue() || '').trim();
     if (!gegner) continue;
 
-    const datum = saisonSheet.getRange(row, 1).getValue();
-    if (!(datum instanceof Date) || isNaN(datum.getTime())) continue;
+    const datum = saisonSheet.getRange(row, saisonDatumCol()).getValue();
+    if (!(datum instanceof Date)) continue;
 
-    const abwesendeNamen = new Set(
-      readAbwesenheitenFuerDatum(abwesenheitenSheet, datum)
-        .filter(a => !a.kommentar.toLowerCase().includes('muss'))
-        .map(a => a.spieler)
+    const abwesende = readAbwesenheitenFuerDatum(abwesenheitenSheet, datum);
+    const abwesendHard = new Set(
+      abwesende.filter(a => !a.kommentar.toLowerCase().includes('muss')).map(a => a.spieler)
     );
 
-    const verfuegbare = aktiveSpieler
-      .filter(s => !abwesendeNamen.has(s.name))
-      .sort((a, b) => a.rang - b.rang);
-
-    const einzahl = SHEET_CONFIG.einstellungen.spielformat.einzel;
-
-    for (let slot = 0; slot < maxSlots; slot++) {
-      const einsatzartCell = saisonSheet.getRange(row, saisonEinsatzartCol(slot));
-      const spielerCell = saisonSheet.getRange(row, saisonSpielerCol(slot));
-
-      const existingSpieler = String(spielerCell.getValue() || '').trim();
-      const existingEinsatzart = String(einsatzartCell.getValue() || '').trim();
-
-      if (existingSpieler && existingEinsatzart) continue;
-
-      if (slot < einzahl) {
-        if (!existingEinsatzart) einsatzartCell.setValue('Einzel+Doppel');
-        if (!existingSpieler && slot < verfuegbare.length) {
-          spielerCell.setValue(verfuegbare[slot].name);
-        }
-      } else {
-        if (!existingEinsatzart) einsatzartCell.setValue('Doppel');
-        if (!existingSpieler && slot - einzahl < verfuegbare.length) {
-          spielerCell.setValue(verfuegbare[slot].name);
-        }
-      }
-    }
-
-    const statusCell = saisonSheet.getRange(row, saisonStatusCol());
-    if (!String(statusCell.getValue()).trim()) {
-      statusCell.setValue('Geplant');
-    }
+    fillEmptyEinsatzarten(saisonSheet, row, aktiveSpieler, abwesendHard);
+    validateRow(saisonSheet, row, aktiveSpieler, abwesende);
   }
-
-  updateHinweisSpalte(saisonSheet, spielerSheet, abwesenheitenSheet, aktiveSpieler);
 }
 
-function updateHinweisSpalte(
+function fillPlayerPresence(
   saisonSheet: GoogleAppsScript.Spreadsheet.Sheet,
-  spielerSheet: GoogleAppsScript.Spreadsheet.Sheet,
   abwesenheitenSheet: GoogleAppsScript.Spreadsheet.Sheet,
-  aktiveSpieler: Spieler[]
+  aktiveSpieler: Spieler[],
+  lastRow: number
 ): void {
-  const lastRow = saisonSheet.getLastRow();
-  const maxSlots = saisonMaxSlots();
-
   for (let row = 2; row <= lastRow; row++) {
-    const gegner = String(saisonSheet.getRange(row, 2).getValue() || '').trim();
-    if (!gegner) {
-      saisonSheet.getRange(row, saisonHinweisCol()).setValue('');
-      continue;
-    }
+    const datum = saisonSheet.getRange(row, saisonDatumCol()).getValue();
+    if (!(datum instanceof Date)) continue;
 
-    const datum = saisonSheet.getRange(row, 1).getValue();
-    if (!(datum instanceof Date) || isNaN(datum.getTime())) continue;
-
-    const abwAlle = readAbwesenheitenFuerDatum(abwesenheitenSheet, datum);
+    const abwesende = readAbwesenheitenFuerDatum(abwesenheitenSheet, datum);
     const abwMap = new Map<string, Abwesenheit>();
-    for (const a of abwAlle) {
-      abwMap.set(a.spieler, a);
-    }
+    for (const a of abwesende) abwMap.set(a.spieler, a);
 
-    const hinweise: string[] = [];
+    for (let pi = 0; pi < aktiveSpieler.length; pi++) {
+      const name = aktiveSpieler[pi].name;
+      const abw = abwMap.get(name);
+      const cell = saisonSheet.getRange(row, saisonSpielerCol(pi));
+      const current = String(cell.getValue() || '').trim();
 
-    for (let slot = 0; slot < maxSlots; slot++) {
-      const spielerName = String(saisonSheet.getRange(row, saisonSpielerCol(slot)).getValue() || '').trim();
-      if (!spielerName) continue;
-
-      const sp = aktiveSpieler.find(s => s.name === spielerName);
-      if (sp && !sp.aenderungenMelden) continue;
-
-      const abw = abwMap.get(spielerName);
       if (abw) {
-        hinweise.push(`${spielerName}: abwesend (${abw.kommentar || 'kein Kommentar'})`);
-      } else if (!aktiveSpieler.some(s => s.name === spielerName) && spielerName.includes(' ')) {
-        hinweise.push(`${spielerName}: nicht im Spieler-Sheet`);
+        const isHard = !abw.kommentar.toLowerCase().includes('muss');
+        if (isHard) {
+          cell.setValue(`✗ ${abw.kommentar || 'abwesend'}`);
+        }
+      } else if (!current || current.startsWith('✗')) {
+        cell.setValue('');
       }
     }
-
-    saisonSheet.getRange(row, saisonHinweisCol()).setValue(hinweise.join(' | '));
   }
+}
+
+function fillEmptyEinsatzarten(
+  saisonSheet: GoogleAppsScript.Spreadsheet.Sheet,
+  row: number,
+  aktiveSpieler: Spieler[],
+  abwesendHard: Set<string>
+): void {
+  const verfuegbare = aktiveSpieler
+    .filter(s => !abwesendHard.has(s.name))
+    .sort((a, b) => a.rang - b.rang);
+
+  for (let pi = 0; pi < aktiveSpieler.length; pi++) {
+    const cell = saisonSheet.getRange(row, saisonSpielerCol(pi));
+    const current = String(cell.getValue() || '').trim();
+
+    if (current && !current.startsWith('✗')) continue;
+
+    const name = aktiveSpieler[pi].name;
+    if (abwesendHard.has(name)) continue;
+
+    const rank = verfuegbare.findIndex(s => s.name === name);
+    if (rank >= 0 && rank < 4) {
+      cell.setValue('Einzel+Doppel');
+    }
+  }
+}
+
+function validateRow(
+  saisonSheet: GoogleAppsScript.Spreadsheet.Sheet,
+  row: number,
+  aktiveSpieler: Spieler[],
+  abwesende: Abwesenheit[]
+): void {
+  const v = validateAufstellung(saisonSheet, row, aktiveSpieler, abwesende);
+  saisonSheet.getRange(row, saisonHinweisCol()).setValue(v.warnungen.join(' | '));
+}
+
+function validateAufstellung(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  row: number,
+  aktiveSpieler: Spieler[],
+  abwesende: Abwesenheit[]
+): SaisonValidierung {
+  let einzel = 0;
+  let doppel = 0;
+  let ersatz = 0;
+  const warnungen: string[] = [];
+  const abwMap = new Map<string, string>();
+  for (const a of abwesende) abwMap.set(a.spieler, a.kommentar);
+
+  for (let pi = 0; pi < aktiveSpieler.length; pi++) {
+    const val = String(sheet.getRange(row, saisonSpielerCol(pi)).getValue() || '').trim();
+    if (!val || val.startsWith('✗')) continue;
+
+    const name = aktiveSpieler[pi].name;
+    if (val === 'Einzel+Doppel') { einzel++; doppel++; }
+    else if (val === 'Einzel') einzel++;
+    else if (val === 'Doppel') doppel++;
+
+    if (abwMap.has(name)) {
+      warnungen.push(`${name}: abwesend (${abwMap.get(name)})`);
+    }
+  }
+
+  for (let ei = 0; ei < 3; ei++) {
+    const eName = String(sheet.getRange(row, saisonErsatzCol(ei)).getValue() || '').trim();
+    if (eName) {
+      ersatz++;
+      einzel++;
+      doppel++;
+    }
+  }
+
+  const gesamt = einzel > doppel ? einzel : doppel;
+  if (gesamt > 6) warnungen.push(`Mehr als 6 Spieler aufgestellt (${gesamt})`);
+
+  const f = SHEET_CONFIG.einstellungen.spielformat;
+  if (einzel < f.einzel) warnungen.push(`Nur ${einzel}/${f.einzel} Einzel-Spieler`);
+  if (doppel < f.doppel) warnungen.push(`Nur ${doppel}/${f.doppel} Doppel-Spieler`);
+
+  return { einzelCount: einzel, doppelCount: doppel, ersatzCount: ersatz, gesamtCount: gesamt, warnungen };
 }
 
 function readAktiveSpieler(sheet: GoogleAppsScript.Spreadsheet.Sheet): Spieler[] {
   const lastRow = sheet.getLastRow();
-  if (lastRow <= 1) {
-    return [];
-  }
+  if (lastRow <= 1) return [];
 
   const data = sheet.getRange(2, 1, lastRow - 1, COL_SPIELER.Rolle).getValues();
   const spieler: Spieler[] = [];
@@ -124,10 +158,8 @@ function readAktiveSpieler(sheet: GoogleAppsScript.Spreadsheet.Sheet): Spieler[]
     if (row[COL_SPIELER.Aktiv - 1] === true || row[COL_SPIELER.Aktiv - 1] === 'TRUE') {
       const name = String(row[COL_SPIELER.Name - 1]).trim();
       if (!name) continue;
-
       let rang = Number(row[COL_SPIELER.Rang - 1]);
       if (isNaN(rang) || rang <= 0) rang = 99;
-
       spieler.push({
         name,
         email: String(row[COL_SPIELER.Email - 1]),
@@ -137,7 +169,6 @@ function readAktiveSpieler(sheet: GoogleAppsScript.Spreadsheet.Sheet): Spieler[]
       });
     }
   }
-
   return spieler;
 }
 
@@ -146,28 +177,26 @@ function readAbwesenheitenFuerDatum(
   datum: Date
 ): Abwesenheit[] {
   const lastRow = sheet.getLastRow();
-  if (lastRow <= 1) {
-    return [];
-  }
+  if (lastRow <= 1) return [];
 
   const data = sheet.getRange(2, 1, lastRow - 1, COL_ABWESENHEITEN.Kommentar).getValues();
-  const abwesenheiten: Abwesenheit[] = [];
+  const result: Abwesenheit[] = [];
   const d = new Date(datum.getFullYear(), datum.getMonth(), datum.getDate());
 
   for (const row of data) {
-    const von = row[COL_ABWESENHEITEN.Von - 1] instanceof Date ? row[COL_ABWESENHEITEN.Von - 1] : new Date(row[COL_ABWESENHEITEN.Von - 1]);
-    const bis = row[COL_ABWESENHEITEN.Bis - 1] instanceof Date ? row[COL_ABWESENHEITEN.Bis - 1] : new Date(row[COL_ABWESENHEITEN.Bis - 1]);
-
+    const von = row[COL_ABWESENHEITEN.Von - 1] instanceof Date
+      ? row[COL_ABWESENHEITEN.Von - 1] : new Date(row[COL_ABWESENHEITEN.Von - 1]);
+    const bis = row[COL_ABWESENHEITEN.Bis - 1] instanceof Date
+      ? row[COL_ABWESENHEITEN.Bis - 1] : new Date(row[COL_ABWESENHEITEN.Bis - 1]);
     if (isNaN(von.getTime()) || isNaN(bis.getTime())) continue;
     if (d < von || d > bis) continue;
 
-    abwesenheiten.push({
+    result.push({
       spieler: String(row[COL_ABWESENHEITEN.Spieler - 1]),
       von,
       bis,
       kommentar: String(row[COL_ABWESENHEITEN.Kommentar - 1]),
     });
   }
-
-  return abwesenheiten;
+  return result;
 }
