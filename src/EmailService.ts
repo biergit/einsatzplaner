@@ -6,6 +6,7 @@ interface EinsatzInfo {
   startzeit: string;
   heimAuswaerts: string;
   einsatzart: string;
+  notTop4: boolean;
 }
 
 function sendEinsatzEmails(): void {
@@ -17,17 +18,26 @@ function sendEinsatzEmails(): void {
   const heute = new Date();
   heute.setHours(0, 0, 0, 0);
 
+  const spielerNames = readSpielerNames(ss);
+  const aktiveSpieler = readAktiveSpieler(ss.getSheetByName(SHEET_NAMES.SPIELER)!);
+  const allAbw = buildAbwesenheitenIndex(ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN)!);
+  const dates = readSaisonDates(saisonSheet, lastRow);
+
+  const numPlayers = spielerNames.length;
+  const allPlayerCols = saisonSheet.getRange(2, saisonSpielerCol(0), lastRow - 1, numPlayers).getValues() as string[][];
+
   const einsaetzeProSpieler: Record<string, EinsatzInfo[]> = {};
   const ohneEmail: string[] = [];
 
-  const spielerNames = readSpielerNames(ss);
+  const spielplan: string[] = [];
 
-  for (let row = 2; row <= lastRow; row++) {
+  for (let r = 0; r < dates.length; r++) {
+    const datum = dates[r];
+    if (!datum || datum < heute) continue;
+
+    const row = r + 2;
     const status = String(saisonSheet.getRange(row, saisonStatusCol()).getValue() || '').trim();
     if (status !== 'Final') continue;
-
-    const datum = saisonSheet.getRange(row, saisonDatumCol()).getValue();
-    if (!(datum instanceof Date) || datum < heute) continue;
 
     const gegner = String(saisonSheet.getRange(row, saisonGegnerCol()).getValue() || '').trim();
     if (!gegner) continue;
@@ -36,22 +46,44 @@ function sendEinsatzEmails(): void {
     const heimAuswaerts = String(saisonSheet.getRange(row, saisonHeimAuswaertsCol()).getValue() || '').trim();
     const datumStr = Utilities.formatDate(datum, 'Europe/Berlin', 'dd.MM.yyyy');
 
-    for (let pi = 0; pi < spielerNames.length; pi++) {
-      const val = String(saisonSheet.getRange(row, saisonSpielerCol(pi)).getValue() || '').trim();
+    const key = dateKey(datum);
+    const dayMap = allAbw.get(key);
+    const available = aktiveSpieler
+      .filter(s => {
+        const abw = dayMap?.get(s.name);
+        return !abw || !abw.startsWith('✗');
+      })
+      .sort((a, b) => a.rang - b.rang);
+    const top4Names = new Set(available.slice(0, 4).map(s => s.name));
+
+    const z = startzeit ? ` – ${startzeit}` : '';
+    spielplan.push(`${datumStr}${z}   ${heimAuswaerts}   ${gegner}`);
+
+    for (let pi = 0; pi < numPlayers; pi++) {
+      const val = String(allPlayerCols[r][pi] || '').trim();
       if (!val || val.startsWith('✗')) continue;
 
       const name = spielerNames[pi];
+      const notTop4 = !top4Names.has(name);
+      const marker = notTop4 ? ' ★' : '';
+      spielplan.push(`  ${name}  →  ${val}${marker}`);
+
       if (!einsaetzeProSpieler[name]) einsaetzeProSpieler[name] = [];
-      einsaetzeProSpieler[name].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: val });
+      einsaetzeProSpieler[name].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: val, notTop4 });
     }
 
     for (let ei = 0; ei < 3; ei++) {
       const eName = String(saisonSheet.getRange(row, saisonErsatzCol(ei)).getValue() || '').trim();
       if (!eName) continue;
+      spielplan.push(`  ${eName}  →  Einzel+Doppel (Ersatz)`);
       if (!einsaetzeProSpieler[eName]) einsaetzeProSpieler[eName] = [];
-      einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: 'Einzel+Doppel' });
+      einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: 'Einzel+Doppel', notTop4: false });
     }
+
+    spielplan.push('');
   }
+
+  const gesamtspielplan = spielplan.join('\n');
 
   const spielerMap = buildSpielerMap();
 
@@ -61,7 +93,7 @@ function sendEinsatzEmails(): void {
       ohneEmail.push(spielerName);
       continue;
     }
-    sendEinsatzplanEmail(spieler, einsaetze);
+    sendEinsatzplanEmail(spieler, einsaetze, gesamtspielplan);
   }
 
   if (ohneEmail.length > 0) {
@@ -124,19 +156,25 @@ function buildSpielerMap(): Record<string, Spieler> {
   return map;
 }
 
-function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[]): void {
+function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], gesamtspielplan: string): void {
   const termineStr = einsaetze
     .sort((a, b) => a.datum.localeCompare(b.datum))
     .map(e => {
       const h = e.heimAuswaerts || '';
       const z = e.startzeit ? ` – ${e.startzeit}` : '';
-      return `  ${e.datum}${z} – ${h} gegen ${e.gegner} (${e.einsatzart})`;
+      const marker = e.notTop4 ? ' ★' : '';
+      return `  ${e.datum}${z} – ${h} gegen ${e.gegner} (${e.einsatzart})${marker}`;
     })
     .join('\n');
+
+  const body = `Hallo ${spieler.name},\n\n` +
+    `hier ist dein Einsatzplan (★ = außerhalb der Top 4):\n\n${termineStr}\n\n` +
+    `─── GESAMTSPIELPLAN ───\n\n${gesamtspielplan}\n\n` +
+    `Viele Grüße,\nDein Einsatzplaner-Team`;
 
   MailApp.sendEmail({
     to: spieler.email,
     subject: 'Dein Einsatzplan – Tischtennis',
-    body: `Hallo ${spieler.name},\n\nhier ist dein Einsatzplan:\n\n${termineStr}\n\nViele Grüße,\nDein Einsatzplaner-Team`,
+    body: body,
   });
 }

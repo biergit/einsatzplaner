@@ -109,7 +109,6 @@ function fillEinsatzartenFast(
 ): void {
   const numPlayers = aktiveSpieler.length;
   const numRows = dates.length;
-  const sortedPlayers = [...aktiveSpieler].sort((a, b) => a.rang - b.rang);
 
   for (let r = 0; r < numRows; r++) {
     const row = r + 2;
@@ -119,6 +118,15 @@ function fillEinsatzartenFast(
     const key = dateKey(dates[r]);
     const dayMap = allAbw.get(key);
 
+    const available = aktiveSpieler
+      .filter(s => {
+        const abw = dayMap?.get(s.name);
+        return !abw || !abw.startsWith('✗');
+      })
+      .sort((a, b) => a.rang - b.rang);
+
+    const top4Names = new Set(available.slice(0, 4).map(s => s.name));
+
     for (let pi = 0; pi < numPlayers; pi++) {
       const col = saisonSpielerCol(pi);
       const cell = sheet.getRange(row, col);
@@ -126,11 +134,7 @@ function fillEinsatzartenFast(
       if (current && !current.startsWith('✗')) continue;
 
       const name = aktiveSpieler[pi].name;
-      const abwDisplay = dayMap?.get(name);
-      if (abwDisplay && abwDisplay.startsWith('✗')) continue;
-
-      const rank = sortedPlayers.findIndex(s => s.name === name);
-      if (rank >= 0 && rank < 4) {
+      if (top4Names.has(name)) {
         cell.setValue('Einzel+Doppel');
       }
     }
@@ -152,6 +156,8 @@ function validateAllRowsFast(
   const statusValues = statusRange.getValues() as string[][];
 
   const playerCols = sheet.getRange(2, saisonSpielerCol(0), numRows, numPlayers).getValues() as string[][];
+
+  const NON_TOP4_BG = '#FFF9E6';
 
   for (let r = 0; r < numRows; r++) {
     const key = dateKey(dates[r]);
@@ -179,11 +185,7 @@ function validateAllRowsFast(
     let ersatz = 0;
     for (let ei = 0; ei < 3; ei++) {
       const eName = String(sheet.getRange(r + 2, saisonErsatzCol(ei)).getValue() || '').trim();
-      if (eName) {
-        ersatz++;
-        einzel++;
-        doppel++;
-      }
+      if (eName) { ersatz++; einzel++; doppel++; }
     }
 
     const gesamt = einzel > doppel ? einzel : doppel;
@@ -196,6 +198,35 @@ function validateAllRowsFast(
   }
 
   hinweisRange.setValues(hinweisValues);
+
+  const gegnerData = sheet.getRange(2, saisonGegnerCol(), numRows, 1).getValues() as string[][];
+  for (let r = 0; r < numRows; r++) {
+    const gegner = String(gegnerData[r][0] || '').trim();
+    if (!gegner) continue;
+
+    const key = dateKey(dates[r]);
+    const dayMap = allAbw.get(key);
+
+    const available = aktiveSpieler
+      .filter(s => {
+        const abw = dayMap?.get(s.name);
+        return !abw || !abw.startsWith('✗');
+      })
+      .sort((a, b) => a.rang - b.rang);
+
+    const top4Names = new Set(available.slice(0, 4).map(s => s.name));
+
+    const bgColors: (string | null)[] = [];
+    for (let pi = 0; pi < numPlayers; pi++) {
+      const val = String(playerCols[r][pi] || '').trim();
+      const name = aktiveSpieler[pi].name;
+      const notTop4 = val && !val.startsWith('✗') && !top4Names.has(name);
+      bgColors.push(notTop4 ? NON_TOP4_BG : null);
+    }
+
+    const bgRow = sheet.getRange(r + 2, saisonSpielerCol(0), 1, numPlayers);
+    bgRow.setBackgrounds([bgColors]);
+  }
 }
 
 function toDate(val: unknown): Date | null {
