@@ -8,11 +8,14 @@ interface ChangeEntry {
   bearbeiter: string;
 }
 
-const DEBOUNCE_MS = 5 * 60 * 1000;
-
 let debounceTimer: GoogleAppsScript.Script.Trigger | null = null;
 
 function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('SHEET_BUILDER_RUNNING') === 'true') {
+    return;
+  }
+
   const range = e.range;
   const sheet = range.getSheet();
   const sheetName = sheet.getName();
@@ -66,9 +69,10 @@ function resetDebounceTimer(): void {
     ScriptApp.deleteTrigger(debounceTimer);
   }
 
+  const minuten = SHEET_CONFIG.einstellungen.debounceMinuten;
   debounceTimer = ScriptApp.newTrigger('onDebounceTimer')
     .timeBased()
-    .after(DEBOUNCE_MS)
+    .after(minuten * 60 * 1000)
     .create();
 }
 

@@ -105,6 +105,7 @@ def read_einstellungen(data_dir: str) -> dict:
         return {
             "teamName": "TT Team",
             "saison": "2026/2027",
+            "debounceMinuten": 5,
             "spielformat": {"einzel": 4, "doppel": 2, "system": "Bundessystem"},
         }
     with open(path, encoding="utf-8") as f:
@@ -118,6 +119,8 @@ def generate_js(spieler, abwesenheiten, spieltermine, einstellungen) -> str:
     lines.append("  einstellungen: {")
     lines.append(f"    teamName: '{einstellungen['teamName']}',")
     lines.append(f"    saison: '{einstellungen['saison']}',")
+    debounce = einstellungen.get("debounceMinuten", 5)
+    lines.append(f"    debounceMinuten: {debounce},")
     sf = einstellungen["spielformat"]
     lines.append("    spielformat: {")
     lines.append(f"      einzel: {sf['einzel']},")

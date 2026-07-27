@@ -19,7 +19,7 @@ Die Dateien im `data/`-Verzeichnis enthalten die Team-Daten (gitignored – kein
 | `spieler.tsv` | TSV | Name, Email, Rang, Änderungen melden, Rolle |
 | `abwesenheiten.tsv` | TSV | Spieler, Von, Bis, Kommentar |
 | `spieltermine.tsv` | TSV | Datum, Heim/Gast, Gegner, Ort |
-| `einstellungen.json` | JSON | teamName, saison, spielformat |
+| `einstellungen.json` | JSON | teamName, saison, debounceMinuten, spielformat |
 
 Vorlagen liegen als `.sample`-Dateien im `data/`-Verzeichnis.
 
@@ -104,7 +104,7 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 
 | Menüpunkt | Beschreibung |
 |-----------|-------------|
-| Sheet neu aufbauen | Löscht alle Sheets und baut sie aus der Konfiguration neu auf |
+| Sheet neu aufbauen | Löscht alle Sheets und baut sie aus der Konfiguration neu auf. Löst **keine** E-Mail-Benachrichtigungen aus. |
 | Daten exportieren | Sichert alle Daten als JSON nach Google Drive |
 | Aufstellungen generieren | Ermittelt verfügbare Spieler pro Termin und füllt das Aufstellungs-Sheet |
 | Aufstellungen finalisieren | Setzt Status aller geplanten Termine auf "Finalisiert" |
@@ -113,9 +113,10 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 ## Automatische Benachrichtigungen
 
 - Bei jeder Bearbeitung durch ein Teammitglied wird die Änderung protokolliert
-- Nach 5 Minuten Inaktivität erhalten alle Spieler mit Checkbox **Änderungen melden** eine E-Mail mit den letzten Änderungen – außer sie waren selbst die Bearbeiter
+- Nach einer konfigurierbaren Zeitspanne ohne weitere Änderung (`debounceMinuten` in `einstellungen.json`) erhalten alle Spieler mit Checkbox **Änderungen melden** eine E-Mail mit den letzten Änderungen – außer sie waren selbst die Bearbeiter
 - Der Bearbeiter wird anhand seiner Google-Account-E-Mail identifiziert
-- Änderungen am Aufstellungs-Sheet und am Änderungslog selbst lösen keine Benachrichtigung aus
+- Änderungen am Dokumentation-, Aufstellungs- und Änderungslog-Sheet lösen keine Benachrichtigung aus
+- Der Neuaufbau des Sheets (Menü → Sheet neu aufbauen) löst keine Benachrichtigungen aus
 
 ## Rollen
 

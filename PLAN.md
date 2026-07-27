@@ -75,11 +75,13 @@ Zeitstempel, Bereich, Alter Wert, Neuer Wert, Bearbeiter
 
 ### Änderungs-Benachrichtigung (ChangeTracker)
 
-1. `onEdit` triggert bei jeder Bearbeitung (außer Aufstellungen und Änderungslog)
-2. Änderung wird ins Änderungslog geschrieben
-3. Debounce-Timer (5 min) wird zurückgesetzt
-4. Nach Ablauf: Alle Benutzer mit Checkbox "Änderungen melden" bekommen E-Mail
-5. Der Bearbeiter selbst wird aus der Empfängerliste ausgeschlossen (via Google-Account-E-Mail)
+1. `onEdit` triggert bei jeder Bearbeitung
+2. Falls `SHEET_BUILDER_RUNNING`-Flag gesetzt → Abbruch (keine Logs/Emails beim Sheet-Neuaufbau)
+3. Bearbeitungen an Dokumentation, Aufstellungen und Änderungslog werden ignoriert
+4. Änderung wird ins Änderungslog geschrieben
+5. Debounce-Timer (konfigurierbar via `einstellungen.debounceMinuten`) wird zurückgesetzt
+6. Nach Ablauf: Alle Benutzer mit Checkbox "Änderungen melden" bekommen E-Mail
+7. Der Bearbeiter selbst wird aus der Empfängerliste ausgeschlossen (via Google-Account-E-Mail)
 
 ### Einsatzplan-E-Mails (EmailService)
 

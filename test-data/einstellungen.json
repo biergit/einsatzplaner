@@ -1,6 +1,7 @@
 {
   "teamName": "TT Team Test",
   "saison": "2026/2027",
+  "debounceMinuten": 1,
   "spielformat": {
     "einzel": 4,
     "doppel": 2,

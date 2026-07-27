@@ -28,9 +28,13 @@ function menuSheetNeuAufbauen(): void {
   }
 
   try {
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty('SHEET_BUILDER_RUNNING', 'true');
     buildAllSheets(SHEET_CONFIG);
+    props.setProperty('SHEET_BUILDER_RUNNING', 'false');
     ui.alert('Fertig', 'Das Sheet wurde erfolgreich neu aufgebaut.', ui.ButtonSet.OK);
   } catch (e) {
+    PropertiesService.getScriptProperties().setProperty('SHEET_BUILDER_RUNNING', 'false');
     ui.alert('Fehler', `Beim Aufbau des Sheets ist ein Fehler aufgetreten:\n${e}`, ui.ButtonSet.OK);
   }
 }

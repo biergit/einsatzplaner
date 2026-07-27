@@ -50,6 +50,10 @@ describe('generated Config.js', () => {
     expect(content).toContain("teamName: 'TT Team Test'");
   });
 
+  it('contains test debounceMinuten', () => {
+    expect(content).toContain('debounceMinuten: 1');
+  });
+
   it('contains all 5 test players', () => {
     const names = [
       'Max Mustermann',

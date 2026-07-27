@@ -70,6 +70,7 @@ type AufstellungsTyp = 'Einzel 1' | 'Einzel 2' | 'Einzel 3' | 'Einzel 4' | 'Dopp
 interface Einstellungen {
   teamName: string;
   saison: string;
+  debounceMinuten: number;
   spielformat: {
     einzel: number;
     doppel: number;
