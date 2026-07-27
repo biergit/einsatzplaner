@@ -55,6 +55,8 @@ function sendEinsatzEmails(): void {
     const top4Names = new Set(available.slice(0, 4).map(s => s.name));
 
     const matchPlayers: string[] = [];
+    let spEinzel = 0;
+    let spDoppel = 0;
     for (let pi = 0; pi < numPlayers; pi++) {
       const val = String(allPlayerCols[r][pi] || '').trim();
       if (!val || val.startsWith('✗')) continue;
@@ -67,14 +69,25 @@ function sendEinsatzEmails(): void {
       }
       if (!einsaetzeProSpieler[name]) einsaetzeProSpieler[name] = [];
       einsaetzeProSpieler[name].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: val, besondereUnterstuetzung: bu });
+      if (val === 'Einzel+Doppel') { spEinzel++; spDoppel++; }
+      else if (val === 'Einzel') spEinzel++;
+      else if (val === 'Doppel') spDoppel++;
     }
+
+    const f = SHEET_CONFIG.einstellungen.spielformat;
+    let missEinzel = Math.max(0, f.einzel - spEinzel);
+    let missDoppel = Math.max(0, f.doppel * 2 - spDoppel);
 
     for (let ei = 0; ei < 3; ei++) {
       const eName = String(saisonSheet.getRange(row, saisonErsatzCol(ei)).getValue() || '').trim();
       if (!eName) continue;
-      matchPlayers.push(`<span style="background:#FFF7E0;padding:1px 4px">${eName} → Einzel+Doppel (Ersatz)</span>`);
+      let ersatzArt: string;
+      if (missEinzel > 0) { ersatzArt = 'Einzel (Ersatz)'; missEinzel--; }
+      else if (missDoppel > 0) { ersatzArt = 'Doppel (Ersatz)'; missDoppel--; }
+      else { ersatzArt = 'Einzel+Doppel (Ersatz)'; }
+      matchPlayers.push(`<span style="background:#FFF7E0;padding:1px 4px">${eName} → ${ersatzArt}</span>`);
       if (!einsaetzeProSpieler[eName]) einsaetzeProSpieler[eName] = [];
-      einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: 'Einzel+Doppel', besondereUnterstuetzung: false });
+      einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: ersatzArt, besondereUnterstuetzung: false });
     }
 
     spielplanRows.push([datumStr, startzeit, heimAuswaerts, gegner, matchPlayers.join('<br>')]);
