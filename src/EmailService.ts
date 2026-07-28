@@ -107,6 +107,8 @@ function sendEinsatzEmails(): void {
   }
 
   if (ohneEmail.length > 0) sendOhneEmailInfo(ss, ohneEmail);
+
+  Logger.log(`sendEinsatzEmails: ${Object.keys(einsaetzeProSpieler).length} Spieler, ${ohneEmail.length} ohne E-Mail`);
 }
 
 function formatStartzeit(val: unknown): string {
@@ -199,6 +201,7 @@ ${abschnitte}
 </body></html>`;
 
   MailApp.sendEmail({ to: kap, subject: 'Einsatzplaner – Spieler ohne hinterlegte E-Mail-Adresse', htmlBody: html });
+  Logger.log(`sendOhneEmailInfo: Mail an Kapitän (${kap}) für ${ohneEmail.length} Spieler ohne E-Mail`);
 }
 
 function getKapitaenEmail(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string {

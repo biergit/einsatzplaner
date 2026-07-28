@@ -1033,6 +1033,7 @@ function sendChangeNotification(
   for (const email of empfaenger) {
     MailApp.sendEmail({ to: email, subject, htmlBody: html });
   }
+  Logger.log(`sendChangeNotification: Mail an ${empfaenger.length} Empfänger (${empfaenger.join(', ')})`);
 }
 
 // ─── Saison-Tabellen-Builder für die Mail ───────────────────────────────────
