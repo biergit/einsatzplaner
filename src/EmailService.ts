@@ -162,7 +162,7 @@ function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohne
   body += 'Bitte informiere sie persönlich über ihre Einsätze.\n\n';
   body += 'Dein Einsatzplaner-Team';
 
-  MailApp.sendEmail({ to: kap, subject: 'Einsatzplaner – Spieler ohne E-Mail-Adresse', body });
+  MailApp.sendEmail({ to: kap, subject: 'Einsatzplaner – Spieler ohne hinterlegte E-Mail-Adresse', body });
 }
 
 function getKapitaenEmail(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string {

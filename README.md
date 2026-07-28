@@ -123,9 +123,9 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 
 | Rolle | Bedeutung |
 |-------|-----------|
-| `Kapitän` | Erhält Änderungs-Mails immer (auch ohne Checkbox). Bekommt nach dem E-Mail-Versand einen Hinweis über eingesetzte Spieler ohne E-Mail-Adresse |
+| `Kapitän` | Erhält Änderungs-Mails immer (auch ohne Checkbox). Bekommt nach dem E-Mail-Versand einen Hinweis über eingesetzte Spieler ohne hinterlegte E-Mail-Adresse |
 | *(leer)* | Normales Teammitglied – erhält Änderungs-Mails nur bei gesetzter Checkbox |
 
-## Spieler ohne E-Mail
+## Spieler ohne hinterlegte E-Mail-Adresse
 
 E-Mail-Adressen sind optional. Hat ein eingesetzter Spieler keine E-Mail hinterlegt, bekommt der Kapitän nach dem Versand der Einsatzpläne eine separate Nachricht mit der Liste dieser Spieler und ihren konkreten Spieltagen – damit er sie persönlich kontaktieren kann.

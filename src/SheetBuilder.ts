@@ -63,7 +63,7 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['', '', ''],
     ['BENACHRICHTIGUNGEN', '', ''],
     ['Änderungs-Mail', `Nach ${einstellungen.debounceMinuten} Min. an Kapitän (immer) + Checkbox-Inhaber`, 'Nur bei Saison-Änderungen (Aufstellung, Gegner, Startzeit, Status) und Abwesenheiten mit Spieltags-Bezug. Neue, nur geplante Spieltage lösen keine Mail aus.'],
-    ['Aufstellungs-Mail', 'HTML mit persönlichem Plan + Gesamtspielplan', 'Spieler ohne E-Mail → Kapitän-Hinweis mit Spieltag-Details. Ersatzspieler + Nicht-Stammspieler (Rang > 4) gelb hervorgehoben.'],
+    ['Aufstellungs-Mail', 'HTML mit persönlichem Plan + Gesamtspielplan', 'Spieler ohne hinterlegte E-Mail-Adresse → Kapitän-Hinweis mit Spieltag-Details. Ersatzspieler + Nicht-Stammspieler (Rang > 4) gelb hervorgehoben.'],
   ];
 
   const numCols = 3;

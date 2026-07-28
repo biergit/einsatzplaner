@@ -97,7 +97,7 @@ Zeitstempel, Bereich, Alter Wert, Neuer Wert, Bearbeiter
 
 | Rolle | Beschreibung |
 |-------|-------------|
-| `Kapitän` | Erhält Änderungs-Mails immer (auch ohne Checkbox). Erhält Hinweis über eingesetzte Spieler ohne E-Mail-Adresse |
+| `Kapitän` | Erhält Änderungs-Mails immer (auch ohne Checkbox). Erhält Hinweis über eingesetzte Spieler ohne hinterlegte E-Mail-Adresse |
 | *(leer)* | Normales Teammitglied, erhält Änderungs-Mails nur bei gesetzter Checkbox |
 
 Die Rolle ist unabhängig von der Checkbox "Änderungen melden" – ein Spieler kann beides haben, nur eines oder keines.
