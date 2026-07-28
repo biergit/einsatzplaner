@@ -41,6 +41,7 @@ interface SaisonRowSnapshot {
   playerNames: string[];
   ersatz: string[];
   status: string;
+  hinweis: string;
 }
 
 // ─── onEdit (nur installierbarer Trigger läuft durch) ─────────────────────
@@ -437,6 +438,7 @@ function readSaisonSnapshot(sheet: GoogleAppsScript.Spreadsheet.Sheet | null): S
       playerNames: names,
       ersatz,
       status: String(data[r][saisonStatusCol() - 1] || '').trim(),
+      hinweis: String(data[r][saisonHinweisCol() - 1] || '').trim(),
     });
   }
   return rows;
@@ -776,6 +778,7 @@ function diffSaisonRow(oldR: SaisonRowSnapshot, newR: SaisonRowSnapshot): Change
   }
 
   if (oldR.status !== newR.status) changes.push({ label: 'Status', oldVal: oldR.status, newVal: newR.status });
+  if (oldR.hinweis !== newR.hinweis) changes.push({ label: 'Hinweis', oldVal: oldR.hinweis, newVal: newR.hinweis });
 
   return changes;
 }
@@ -1004,6 +1007,7 @@ function buildColumnListFromRow(row: SaisonRowSnapshot): { label: string; oldVal
     if (v) cols.push({ label: `Ersatz ${ei + 1}`, oldVal: '', newVal: v });
   }
   cols.push({ label: 'Status', oldVal: '', newVal: row.status });
+  if (row.hinweis) cols.push({ label: 'Hinweis', oldVal: '', newVal: row.hinweis });
   return cols;
 }
 
@@ -1028,6 +1032,9 @@ function buildFullColumnList(oldR: SaisonRowSnapshot, newR: SaisonRowSnapshot, c
     }
   }
   cols.push({ label: 'Status', oldVal: oldR.status, newVal: newR.status });
+  if (oldR.hinweis || newR.hinweis || changedSet.has('Hinweis')) {
+    cols.push({ label: 'Hinweis', oldVal: oldR.hinweis, newVal: newR.hinweis });
+  }
   return cols;
 }
 
