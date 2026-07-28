@@ -7,6 +7,7 @@ interface EinsatzInfo {
   heimAuswaerts: string;
   einsatzart: string;
   besondereUnterstuetzung: boolean;
+  hinweis: string;
 }
 
 function sendEinsatzEmails(): void {
@@ -44,6 +45,7 @@ function sendEinsatzEmails(): void {
     const startzeit = formatStartzeit(startVal);
 
     const heimAuswaerts = String(saisonSheet.getRange(row, saisonHeimAuswaertsCol()).getValue() || '').trim();
+    const hinweisText = String(saisonSheet.getRange(row, saisonHinweisCol()).getValue() || '').trim();
     const datumStr = Utilities.formatDate(datum, 'Europe/Berlin', 'dd.MM.yyyy');
 
     const key = dateKey(datum);
@@ -68,7 +70,7 @@ function sendEinsatzEmails(): void {
         matchPlayers.push(`${name} → ${val}`);
       }
       if (!einsaetzeProSpieler[name]) einsaetzeProSpieler[name] = [];
-      einsaetzeProSpieler[name].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: val, besondereUnterstuetzung: bu });
+      einsaetzeProSpieler[name].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: val, besondereUnterstuetzung: bu, hinweis: hinweisText });
       if (val === 'Einzel+Doppel') { spEinzel++; spDoppel++; }
       else if (val === 'Einzel') spEinzel++;
       else if (val === 'Doppel') spDoppel++;
@@ -87,7 +89,7 @@ function sendEinsatzEmails(): void {
       else { ersatzArt = 'Einzel+Doppel (Ersatz)'; }
       matchPlayers.push(`<span style="background:#FFF7E0;padding:1px 4px">${eName} → ${ersatzArt}</span>`);
       if (!einsaetzeProSpieler[eName]) einsaetzeProSpieler[eName] = [];
-      einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: ersatzArt, besondereUnterstuetzung: false });
+      einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: ersatzArt, besondereUnterstuetzung: false, hinweis: hinweisText });
     }
 
     spielplanRows.push([datumStr, startzeit, heimAuswaerts, gegner, matchPlayers.join('<br>')]);
@@ -146,23 +148,39 @@ function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohne
   const kap = getKapitaenEmail(ss);
   if (!kap) return;
 
-  let body = 'Hallo,\n\n';
-  body += 'Es wurden soeben Spielpläne finalisiert und Einsatz-Mails verschickt.\n';
-  body += 'Folgende eingesetzte Spieler haben keine E-Mail-Adresse und konnten nicht automatisch benachrichtigt werden:\n\n';
+  const style = 'font-family:Arial,sans-serif;font-size:14px;color:#333';
+  const thStyle = 'background:#4A90D9;color:#fff;text-align:left;padding:6px';
+  const tdStyle = 'padding:6px;vertical-align:top';
 
+  let rows = '';
   for (const { name, einsaetze } of ohneEmail) {
-    body += `${name}:\n`;
     for (const e of einsaetze.sort((a, b) => a.datum.localeCompare(b.datum))) {
+      const h = e.heimAuswaerts || '';
       const z = e.startzeit ? ` ${e.startzeit}` : '';
-      body += `  – ${e.datum}${z} (${e.heimAuswaerts ? e.heimAuswaerts + ' – ' : ''}${e.gegner})\n`;
+      rows += `<tr>
+<td style="${tdStyle}">${escapeHtml(e.datum)}${escapeHtml(z)}</td>
+<td style="${tdStyle}">${escapeHtml(h)}</td>
+<td style="${tdStyle}">${escapeHtml(e.gegner)}</td>
+<td style="${tdStyle}">${escapeHtml(name)}</td>
+<td style="${tdStyle}">${escapeHtml(e.einsatzart)}</td>
+<td style="${tdStyle}">${escapeHtml(e.hinweis)}</td>
+</tr>`;
     }
-    body += '\n';
   }
 
-  body += 'Bitte informiere sie persönlich über ihre Einsätze.\n\n';
-  body += 'Dein Einsatzplaner-Team';
+  const html = `<html><body style="${style}">
+<p>Hallo,</p>
+<p>Es wurden soeben Spielpläne finalisiert und Einsatz-Mails verschickt.<br>
+Folgende eingesetzte Spieler haben keine E-Mail-Adresse und konnten nicht automatisch benachrichtigt werden:</p>
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:13px;width:100%">
+<tr><th style="${thStyle}">Datum / Zeit</th><th style="${thStyle}">Ort</th><th style="${thStyle}">Gegner</th><th style="${thStyle}">Spieler</th><th style="${thStyle}">Einsatzart</th><th style="${thStyle}">Hinweis</th></tr>
+${rows}
+</table>
+<p style="margin-top:12px">Bitte informiere sie persönlich über ihre Einsätze.</p>
+<p style="color:#888">Viele Grüße,<br>Dein Einsatzplaner-Team</p>
+</body></html>`;
 
-  MailApp.sendEmail({ to: kap, subject: 'Einsatzplaner – Spieler ohne hinterlegte E-Mail-Adresse', body });
+  MailApp.sendEmail({ to: kap, subject: 'Einsatzplaner – Spieler ohne hinterlegte E-Mail-Adresse', htmlBody: html });
 }
 
 function getKapitaenEmail(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string {
