@@ -167,7 +167,11 @@ function sendOhneEmailInfo(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohneEma
   let abschnitte = '';
   for (const { name, einsaetze } of ohneEmail) {
     let rows = '';
-    for (const e of einsaetze.sort((a, b) => a.datum.localeCompare(b.datum))) {
+    for (const e of einsaetze.sort((a, b) => {
+      const [da, ma, ya] = a.datum.split('.').map(Number);
+      const [db, mb, yb] = b.datum.split('.').map(Number);
+      return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
+    })) {
       const h = e.heimAuswaerts || '';
       const z = e.startzeit ? ` ${e.startzeit}` : '';
       rows += `<tr>
@@ -230,19 +234,30 @@ function buildSpielerMap(): Record<string, Spieler> {
 function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], spielplanRows: string[][]): void {
   const htmlTable = buildHtmlTable(spielplanRows);
 
+  const sorted = [...einsaetze].sort((a, b) => {
+    const [da, ma, ya] = a.datum.split('.').map(Number);
+    const [db, mb, yb] = b.datum.split('.').map(Number);
+    return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
+  });
+
+  const hasKommentar = sorted.some(e => e.kommentar);
+
   let personliche = '';
-  for (const e of einsaetze.sort((a, b) => a.datum.localeCompare(b.datum))) {
+  for (const e of sorted) {
     const h = e.heimAuswaerts || '';
     const z = e.startzeit ? ` ${e.startzeit}` : '';
     const style = e.besondereUnterstuetzung ? ' style="background:#FFF7E0"' : '';
-    personliche += `<tr${style}><td>${e.datum}${z}</td><td>${h}</td><td>${e.gegner}</td><td>${e.einsatzart}</td></tr>`;
+    const kmt = hasKommentar ? `<td>${escapeHtml(e.kommentar)}</td>` : '';
+    personliche += `<tr${style}><td>${e.datum}${z}</td><td>${h}</td><td>${e.gegner}</td><td>${e.einsatzart}</td>${kmt}</tr>`;
   }
+
+  const kmtHead = hasKommentar ? '<th>Kommentar</th>' : '';
 
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:14px">
 <p>Hallo ${spieler.name},</p>
 <p>hier ist dein <b>persönlicher Einsatzplan</b>:</p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px">
-<tr style="background:#4A90D9;color:white"><th>Datum / Zeit</th><th>Ort</th><th>Gegner</th><th>Einsatzart</th></tr>
+<tr style="background:#4A90D9;color:white"><th>Datum / Zeit</th><th>Ort</th><th>Gegner</th><th>Einsatzart</th>${kmtHead}</tr>
 ${personliche}
 </table>
 <p>─── <b>GESAMTSPIELPLAN</b> ───</p>
