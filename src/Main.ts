@@ -69,10 +69,13 @@ function menuFinalisierenUndSenden(): void {
   if (antwort !== ui.Button.YES) return;
 
   PropertiesService.getScriptProperties().setProperty('SUPPRESS_NOTIFICATION', 'true');
+  PropertiesService.getScriptProperties().setProperty('BULK_EDIT', 'true');
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const saisonSheet = ss.getSheetByName(SHEET_NAMES.SAISON);
   if (!saisonSheet) {
+    PropertiesService.getScriptProperties().deleteProperty('SUPPRESS_NOTIFICATION');
+    PropertiesService.getScriptProperties().deleteProperty('BULK_EDIT');
     ui.alert('Fehler', 'Saison-Sheet nicht gefunden.', ui.ButtonSet.OK);
     return;
   }
@@ -82,13 +85,16 @@ function menuFinalisierenUndSenden(): void {
   for (let row = 2; row <= lastRow; row++) {
     const statusCell = saisonSheet.getRange(row, saisonStatusCol());
     if (String(statusCell.getValue()).trim() === 'Geplant') {
-      const gegner = String(saisonSheet.getRange(row, 2).getValue() || '').trim();
+      const gegner = String(saisonSheet.getRange(row, saisonGegnerCol()).getValue() || '').trim();
       if (gegner) {
         statusCell.setValue('Final');
         count++;
       }
     }
   }
+
+  PropertiesService.getScriptProperties().deleteProperty('BULK_EDIT');
+  resetDebounceTimer();
 
   try {
     sendEinsatzEmails();

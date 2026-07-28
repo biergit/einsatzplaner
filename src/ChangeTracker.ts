@@ -455,11 +455,16 @@ function addPendingEdit(entry: ChangeEntry): void {
 }
 
 /**
- * Löscht alle ggf. noch existierenden onDebounceTimer-Trigger und legt
- * genau einen neuen an. Läuft im Simple-Trigger in einen try-catch (kein ScriptApp-Recht).
+ * Stellt sicher, dass ein onDebounceTimer-Trigger existiert.
+ * Während Bulk-Operationen (SHEET_BUILDER_RUNNING oder BULK_EDIT) wird
+ * kein Timer angelegt — der Aufrufer muss das selbst am Ende tun.
  */
 function resetDebounceTimer(): void {
   try {
+    const props = PropertiesService.getScriptProperties();
+    if (props.getProperty('SHEET_BUILDER_RUNNING') === 'true') return;
+    if (props.getProperty('BULK_EDIT') === 'true') return;
+
     for (const t of ScriptApp.getProjectTriggers()) {
       if (t.getHandlerFunction() === 'onDebounceTimer') ScriptApp.deleteTrigger(t);
     }
