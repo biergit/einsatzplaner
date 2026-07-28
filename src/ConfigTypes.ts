@@ -12,7 +12,7 @@ enum COL_ABWESENHEITEN {
   Von = 2,
   Bis = 3,
   Kommentar = 4,
-  Hinweis = 5,
+  Validierung = 5,
 }
 
 enum COL_AENDERUNGSLOG {
@@ -50,12 +50,12 @@ function saisonKommentarCol(): number {
   return saisonStatusCol() + 1;
 }
 
-function saisonHinweisCol(): number {
+function saisonValidierungCol(): number {
   return saisonStatusCol() + 2;
 }
 
 function saisonColCount(): number {
-  return saisonHinweisCol();
+  return saisonValidierungCol();
 }
 
 interface Spieler {

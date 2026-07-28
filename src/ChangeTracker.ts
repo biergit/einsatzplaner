@@ -214,11 +214,11 @@ function rebuildAbwesenheitenInSaison(ss: GoogleAppsScript.Spreadsheet.Spreadshe
 
   if (playerChanged || statusChanged) {
     const refreshedAllAbw = buildAbwesenheitenIndex(ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN)!);
-    const hinweisValues: string[][] = [];
+    const validierungValues: string[][] = [];
     for (let r = 0; r < numRows; r++) {
-      hinweisValues.push([computeHinweis(allPlayerCols[r], dates[r], aktiveSpieler, refreshedAllAbw, saisonSheet, r + 2)]);
+      validierungValues.push([computeValidierung(allPlayerCols[r], dates[r], aktiveSpieler, refreshedAllAbw, saisonSheet, r + 2)]);
     }
-    saisonSheet.getRange(2, saisonHinweisCol(), numRows, 1).setValues(hinweisValues);
+    saisonSheet.getRange(2, saisonValidierungCol(), numRows, 1).setValues(validierungValues);
   }
 
   // Betroffene Spieltage für die spätere Mail-Anreicherung speichern
@@ -281,17 +281,17 @@ function formatTimeForLog(val: unknown): string {
 
 /**
  * Prüft die Von/Bis-Daten einer Abwesenheitszeile und schreibt
- * eine Validierungsmeldung in die Hinweis-Spalte.
+ * eine Validierungsmeldung in die Validierungsspalte.
  */
 function validateAbwesenheitRow(sheet: GoogleAppsScript.Spreadsheet.Sheet, row: number): void {
-  const data = sheet.getRange(row, 1, 1, COL_ABWESENHEITEN.Hinweis).getValues()[0];
+  const data = sheet.getRange(row, 1, 1, COL_ABWESENHEITEN.Validierung).getValues()[0];
   const spieler = String(data[COL_ABWESENHEITEN.Spieler - 1] || '').trim();
   const von = toDateSafe(data[COL_ABWESENHEITEN.Von - 1]);
   const bis = toDateSafe(data[COL_ABWESENHEITEN.Bis - 1]);
 
   // Nur validieren wenn mindestens ein Feld gefüllt ist
   if (!spieler && !von && !bis) {
-    sheet.getRange(row, COL_ABWESENHEITEN.Hinweis).setValue('');
+    sheet.getRange(row, COL_ABWESENHEITEN.Validierung).setValue('');
     return;
   }
 
@@ -303,7 +303,7 @@ function validateAbwesenheitRow(sheet: GoogleAppsScript.Spreadsheet.Sheet, row: 
     fehler.push('Von-Datum muss vor dem Bis-Datum liegen');
   }
 
-  sheet.getRange(row, COL_ABWESENHEITEN.Hinweis).setValue(fehler.join(' | '));
+  sheet.getRange(row, COL_ABWESENHEITEN.Validierung).setValue(fehler.join(' | '));
 }
 
 // ─── Data-Validation nach Cut+Paste wiederherstellen ───────────────────────
@@ -783,9 +783,9 @@ function diffSaisonRow(oldR: SaisonRowSnapshot, newR: SaisonRowSnapshot): Change
   return changes;
 }
 
-// ─── Saison-Validierung (Hinweis-Spalte) ───────────────────────────────────
+// ─── Saison-Validierung (Validierungsspalte) ───────────────────────────────────
 
-function computeHinweis(
+function computeValidierung(
   playerRow: string[],
   datum: Date,
   aktiveSpieler: Spieler[],
@@ -854,7 +854,7 @@ function validateAndUpdateSaisonRow(editedRange: GoogleAppsScript.Spreadsheet.Ra
 
   const gegner = String(sheet.getRange(row, saisonGegnerCol()).getValue() || '').trim();
   if (!gegner) {
-    sheet.getRange(row, saisonHinweisCol()).setValue('');
+    sheet.getRange(row, saisonValidierungCol()).setValue('');
     return;
   }
 
@@ -866,8 +866,8 @@ function validateAndUpdateSaisonRow(editedRange: GoogleAppsScript.Spreadsheet.Ra
 
   const allAbw = buildAbwesenheitenIndex(ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN)!);
   const playerRow = sheet.getRange(row, saisonSpielerCol(0), 1, aktiveSpieler.length).getValues()[0] as string[];
-  const hinweis = computeHinweis(playerRow, datum, aktiveSpieler, allAbw, sheet, row);
-  sheet.getRange(row, saisonHinweisCol()).setValue(hinweis);
+  const validierung = computeValidierung(playerRow, datum, aktiveSpieler, allAbw, sheet, row);
+  sheet.getRange(row, saisonValidierungCol()).setValue(validierung);
 }
 
 // ─── Änderungslog-Blatt (unverändert) ──────────────────────────────────────

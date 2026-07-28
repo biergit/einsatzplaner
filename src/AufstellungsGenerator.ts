@@ -157,13 +157,13 @@ function validateAllRowsFast(
   const gegnerData = sheet.getRange(2, saisonGegnerCol(), numRows, 1).getValues() as string[][];
   const playerCols = sheet.getRange(2, saisonSpielerCol(0), numRows, numPlayers).getValues() as string[][];
 
-  const hinweisValues: string[][] = [];
+  const validierungValues: string[][] = [];
   const NON_TOP4_BG = '#FFF9E6';
 
   for (let r = 0; r < numRows; r++) {
     const gegner = String(gegnerData[r][0] || '').trim();
     if (!gegner) {
-      hinweisValues.push(['']);
+      validierungValues.push(['']);
       continue;
     }
 
@@ -199,10 +199,10 @@ function validateAllRowsFast(
     if (einzel < f.einzel) warnungen.push(`Nur ${einzel}/${f.einzel} Einzel-Spieler`);
     if (doppel < f.doppel * 2) warnungen.push(`Nur ${doppel}/${f.doppel * 2} Doppel-Spieler`);
 
-    hinweisValues.push([warnungen.join(' | ')]);
+    validierungValues.push([warnungen.join(' | ')]);
   }
 
-  sheet.getRange(2, saisonHinweisCol(), numRows, 1).setValues(hinweisValues);
+  sheet.getRange(2, saisonValidierungCol(), numRows, 1).setValues(validierungValues);
 
   for (let r = 0; r < numRows; r++) {
     const gegner = String(gegnerData[r][0] || '').trim();

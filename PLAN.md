@@ -51,7 +51,7 @@ Die `.clasp.json*`-Dateien sind alle gitignored (enthalten Google Script-IDs).
 Name, Email (optional), Rang (1-N), Aktiv (Checkbox), Aufstellungsänderungen melden (Checkbox), Rolle (`Kapitän` oder leer)
 
 ### Abwesenheiten (`COL_ABWESENHEITEN`)
-Spieler (Dropdown aus Spieler), Von, Bis, Kommentar, Hinweis (automatische Validierung)
+Spieler (Dropdown aus Spieler), Von, Bis, Kommentar, Validierung (automatische Validierung)
 
 ### Spieltermine (`COL_SPIELTERMINE`)
 Datum, Heim/Gast (Dropdown), Gegner, Ort (optional), Status (Geplant/Finalisiert/Versendet)
@@ -97,7 +97,7 @@ Zeitstempel, Bereich, Alter Wert, Neuer Wert, Bearbeiter
 
 | Rolle | Beschreibung |
 |-------|-------------|
-| `Kapitän` | Erhält Änderungs-Mails immer (auch ohne Checkbox). Erhält Hinweis über eingesetzte Spieler ohne hinterlegte E-Mail-Adresse |
+| `Kapitän` | Erhält Änderungs-Mails immer (auch ohne Checkbox). Erhält Validierung über eingesetzte Spieler ohne hinterlegte E-Mail-Adresse |
 | *(leer)* | Normales Teammitglied, erhält Änderungs-Mails nur bei gesetzter Checkbox |
 
 Die Rolle ist unabhängig von der Checkbox "Änderungen melden" – ein Spieler kann beides haben, nur eines oder keines.
@@ -108,7 +108,7 @@ Alle Sheet-Zugriffe verwenden `COL_*`-Enums aus `ConfigTypes.ts` statt Magic Num
 
 ```typescript
 enum COL_SPIELER { Name = 1, Email = 2, Rang = 3, Aktiv = 4, AenderungenMelden = 5, Rolle = 6 }
-enum COL_ABWESENHEITEN { Spieler = 1, Von = 2, Bis = 3, Kommentar = 4, Hinweis = 5 }
+enum COL_ABWESENHEITEN { Spieler = 1, Von = 2, Bis = 3, Kommentar = 4, Validierung = 5 }
 enum COL_SPIELTERMINE { Datum = 1, HeimGast = 2, Gegner = 3, Ort = 4, Status = 5 }
 enum COL_AUFSTELLUNGEN { Termin = 1, Typ = 2, Spieler = 3 }
 enum COL_AENDERUNGSLOG { Zeitstempel = 1, Bereich = 2, AlterWert = 3, NeuerWert = 4, Bearbeiter = 5 }
@@ -124,7 +124,7 @@ enum COL_AENDERUNGSLOG { Zeitstempel = 1, Bereich = 2, AlterWert = 3, NeuerWert 
 | `src/ChangeTracker.ts` | onEdit-Trigger, Debounce-Timer, Änderungs-Benachrichtigung |
 | `src/DataExporter.ts` | Export aller Sheet-Daten nach Google Drive |
 | `src/AufstellungsGenerator.ts` | Automatische Aufstellungsberechnung |
-| `src/EmailService.ts` | Einsatzplan-E-Mails + Kapitän-Hinweis |
+| `src/EmailService.ts` | Einsatzplan-E-Mails + Kapitän-Validierung |
 | `src/Main.ts` | onOpen-Menü, Menu-Handler |
 | `build.py` | Liest Daten → generiert `dist/Config.js` |
 | `test/build.test.ts` | Validiert Build-Pipeline und generierte Config.js |
@@ -137,7 +137,7 @@ enum COL_AENDERUNGSLOG { Zeitstempel = 1, Bereich = 2, AlterWert = 3, NeuerWert 
 - [x] Spieltermine mit Status-Modell
 - [x] Automatische Aufstellungs-Generierung (Rang + Abwesenheiten)
 - [x] Einsatzplan-E-Mails an Spieler
-- [x] Kapitän-Hinweis bei Spielern ohne E-Mail
+- [x] Kapitän-Validierung bei Spielern ohne E-Mail
 - [x] Test-Build mit fiktiven Daten
 - [ ] Daten-Import aus bestehendem Sheet
 - [ ] Delta-Erkennung bei Aufstellungs-Änderungen (nur geänderte Spieler benachrichtigen)

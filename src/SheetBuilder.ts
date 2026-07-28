@@ -66,7 +66,7 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['', '', ''],
     ['BENACHRICHTIGUNGEN', '', ''],
     ['Änderungs-Mail', `Nach ${einstellungen.debounceMinuten} Min. an Kapitän (immer) + Checkbox-Inhaber`, 'Nur bei Saison-Änderungen (Aufstellung, Gegner, Startzeit, Status) und Abwesenheiten mit Spieltags-Bezug. Neue, nur geplante Spieltage lösen keine Mail aus.'],
-    ['Aufstellungs-Mail', 'HTML mit persönlichem Plan + Gesamtspielplan', 'Spieler ohne hinterlegte E-Mail-Adresse → Kapitän-Hinweis mit Spieltag-Details. Ersatzspieler + Nicht-Stammspieler (Rang > 4) gelb hervorgehoben.'],
+    ['Aufstellungs-Mail', 'HTML mit persönlichem Plan + Gesamtspielplan', 'Spieler ohne hinterlegte E-Mail-Adresse → Kapitän-Mail mit Spieltag-Details. Ersatzspieler + Nicht-Stammspieler (Rang > 4) gelb hervorgehoben.'],
   ];
 
   const numCols = 3;
@@ -129,7 +129,7 @@ function buildAbwesenheitenSheet(config: SheetConfig): GoogleAppsScript.Spreadsh
 
   sheet.setColumnWidth(COL_ABWESENHEITEN.Spieler, 200); sheet.setColumnWidth(COL_ABWESENHEITEN.Von, 140);
   sheet.setColumnWidth(COL_ABWESENHEITEN.Bis, 140); sheet.setColumnWidth(COL_ABWESENHEITEN.Kommentar, 350);
-  sheet.setColumnWidth(COL_ABWESENHEITEN.Hinweis, 300);
+  sheet.setColumnWidth(COL_ABWESENHEITEN.Validierung, 300);
 
   const lastRow = sheet.getMaxRows() - 1;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -168,7 +168,7 @@ function buildSaisonSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.She
   sheet.setColumnWidth(saisonErsatzCol(0), 150); sheet.setColumnWidth(saisonErsatzCol(1), 150);
   sheet.setColumnWidth(saisonErsatzCol(2), 150);
   sheet.setColumnWidth(saisonStatusCol(), 100); sheet.setColumnWidth(saisonKommentarCol(), 250);
-  sheet.setColumnWidth(saisonHinweisCol(), 250);
+  sheet.setColumnWidth(saisonValidierungCol(), 250);
 
   const beginn = new Date(config.einstellungen.saisonBeginn); beginn.setHours(0, 0, 0, 0);
   const ende = new Date(config.einstellungen.saisonEnde); ende.setHours(0, 0, 0, 0);

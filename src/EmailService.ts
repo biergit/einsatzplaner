@@ -104,7 +104,7 @@ function sendEinsatzEmails(): void {
     sendEinsatzplanEmail(spieler, einsaetze, spielplanRows);
   }
 
-  if (ohneEmail.length > 0) sendOhneEmailHinweis(ss, ohneEmail);
+  if (ohneEmail.length > 0) sendOhneEmailInfo(ss, ohneEmail);
 }
 
 function formatStartzeit(val: unknown): string {
@@ -156,7 +156,7 @@ function readSpielerNames(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string[
   return s.getRange(2, COL_SPIELER.Name, lr - 1, 1).getValues().map((r: unknown[]) => String(r[0]).trim()).filter((n: string) => n);
 }
 
-function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohneEmail: { name: string; einsaetze: EinsatzInfo[] }[]): void {
+function sendOhneEmailInfo(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohneEmail: { name: string; einsaetze: EinsatzInfo[] }[]): void {
   const kap = getKapitaenEmail(ss);
   if (!kap) return;
 
