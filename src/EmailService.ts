@@ -128,11 +128,15 @@ function formatStartzeit(val: unknown): string {
 
 function buildHtmlTable(rows: string[][]): string {
   if (rows.length === 0) return '';
+  const hasKommentar = rows.some(r => r[5]);
   let html = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px;width:100%">';
-  html += '<tr style="background:#4A90D9;color:white"><th>Datum</th><th>Zeit</th><th>Ort</th><th>Gegner</th><th>Aufstellung</th><th>Kommentar</th></tr>';
+  html += '<tr style="background:#4A90D9;color:white"><th>Datum</th><th>Zeit</th><th>Ort</th><th>Gegner</th><th>Aufstellung</th>';
+  if (hasKommentar) html += '<th>Kommentar</th>';
+  html += '</tr>';
   for (const r of rows) {
     const aufstellung = r[4].replace(/→/g, '—');
-    html += `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td style="font-size:14px">${aufstellung}</td><td>${escapeHtml(r[5] || '')}</td></tr>`;
+    const kmt = hasKommentar ? `<td>${escapeHtml(r[5] || '')}</td>` : '';
+    html += `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td style="font-size:14px">${aufstellung}</td>${kmt}</tr>`;
   }
   html += '</table>';
   return html;
@@ -165,6 +169,8 @@ function sendOhneEmailInfo(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohneEma
   if (!kap) return;
 
   const s = emailStyles();
+  const hasKommentar = ohneEmail.some(oe => oe.einsaetze.some(e => e.kommentar));
+  const thStyle = `${s.th};width:120px`;
 
   let abschnitte = '';
   for (const { name, einsaetze } of ohneEmail) {
@@ -176,17 +182,18 @@ function sendOhneEmailInfo(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohneEma
     })) {
       const h = e.heimAuswaerts || '';
       const z = e.startzeit ? ` ${e.startzeit}` : '';
+      const kmt = hasKommentar ? `<td style="${s.td}">${escapeHtml(e.kommentar)}</td>` : '';
       rows += `<tr>
 <td style="${s.td}">${escapeHtml(e.datum)}${escapeHtml(z)}</td>
 <td style="${s.td}">${escapeHtml(h)}</td>
 <td style="${s.td}">${escapeHtml(e.gegner)}</td>
-<td style="${s.td}">${escapeHtml(e.einsatzart)}</td>
-<td style="${s.td}">${escapeHtml(e.kommentar)}</td>
+<td style="${s.td}">${escapeHtml(e.einsatzart)}</td>${kmt}
 </tr>`;
     }
+    const kmtHead = hasKommentar ? `<th style="${s.th}">Kommentar</th>` : '';
     abschnitte += `<p style="${s.header}">${escapeHtml(name)}</p>
 <table border="1" cellpadding="4" cellspacing="0" style="${s.table};width:100%">
-<tr><th style="${s.th}">Datum / Zeit</th><th style="${s.th}">Ort</th><th style="${s.th}">Gegner</th><th style="${s.th}">Einsatzart</th><th style="${s.th}">Kommentar</th></tr>
+<tr><th style="${thStyle}">Datum / Zeit</th><th style="${thStyle}">Ort</th><th style="${thStyle}">Gegner</th><th style="${thStyle}">Einsatzart</th>${kmtHead}</tr>
 ${rows}
 </table>`;
   }
