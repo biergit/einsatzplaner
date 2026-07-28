@@ -278,7 +278,7 @@ ${htmlTable}
 
   MailApp.sendEmail({
     to: spieler.email,
-    subject: "Neuer ${SHEET_CONFIG.einstellungen.teamName} - Einsatzplan",
+    subject: `Neuer ${SHEET_CONFIG.einstellungen.teamName} - Einsatzplan`,
     htmlBody: html,
   });
 }
