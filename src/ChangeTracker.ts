@@ -922,11 +922,12 @@ function sendChangeNotification(
     return;
   }
 
-  // Nur relevant wenn Saison- oder Abw-Änderungen vorliegen
-  const hasSaison = saisonDiffs && (saisonDiffs.modified.length > 0 || saisonDiffs.deleted.length > 0 || saisonDiffs.added.length > 0);
+  // Nur relevant wenn sichtbare Saison- oder Abw-Änderungen vorliegen
+  const visibleAdded = saisonDiffs ? saisonDiffs.added.filter(a => a.status === 'Final').length : 0;
+  const visibleSaisonCount = (saisonDiffs?.modified.length ?? 0) + visibleAdded + (saisonDiffs?.deleted.length ?? 0);
   const showAbw = abwAffected && abwAffected.length > 0;
   const abwEntries = showAbw ? entries.filter(e => e.sheetName === SHEET_NAMES.ABWESENHEITEN) : [];
-  if (!hasSaison && abwEntries.length === 0) return;
+  if (visibleSaisonCount === 0 && abwEntries.length === 0) return;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const empfaenger = getAenderungenMeldenEmpfaenger(ss);
@@ -936,12 +937,10 @@ function sendChangeNotification(
   let html = `<html><body style="font-family:Arial,sans-serif;font-size:14px;color:#333">
 <p>Hallo,</p>`;
 
-  if (hasSaison && saisonDiffs) {
-    // ── Sammle alle betroffenen Spieltage ──
-    const count = saisonDiffs.modified.length + saisonDiffs.added.length + saisonDiffs.deleted.length;
-    html += count === 1
+  if (visibleSaisonCount > 0 && saisonDiffs) {
+    html += visibleSaisonCount === 1
       ? `<p>folgender Spieltag wurde aktualisiert:</p>`
-      : `<p>folgende <b>${count}</b> Spieltage wurden aktualisiert:</p>`;
+      : `<p>folgende <b>${visibleSaisonCount}</b> Spieltage wurden aktualisiert:</p>`;
 
     // ── Geänderte Spieltage (2-Zeilen-Tabelle: alt/rot, neu/grün) ──
     for (const mod of saisonDiffs.modified) {
@@ -966,7 +965,7 @@ function sendChangeNotification(
 
   // ── Abwesenheits-Änderungen ──
   if (showAbw && abwEntries.length > 0) {
-    if (hasSaison) html += `<p style="margin-top:20px">Abwesenheits-Änderungen mit Spieltags-Bezug:</p>`;
+    if (visibleSaisonCount > 0) html += `<p style="margin-top:20px">Abwesenheits-Änderungen mit Spieltags-Bezug:</p>`;
     else html += `<p>Abwesenheits-Änderungen mit Spieltags-Bezug:</p>`;
 
     html += `<table cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:13px">`;
