@@ -979,7 +979,8 @@ function sendChangeNotification(
   if (empfaenger.length === 0) return;
 
   const subject = `Einsatzplaner – Änderungen vom ${Utilities.formatDate(new Date(), 'Europe/Berlin', 'dd.MM.yyyy HH:mm')}`;
-  let html = `<html><body style="font-family:Arial,sans-serif;font-size:14px;color:#333">
+  const s = emailStyles();
+  let html = `<html><body style="${s.body}">
 <p>Hallo,</p>`;
 
   if (visibleSaisonCount > 0 && saisonDiffs) {
@@ -1013,9 +1014,9 @@ function sendChangeNotification(
     if (visibleSaisonCount > 0) html += `<p style="margin-top:20px">Abwesenheits-Änderungen mit Spieltags-Bezug:</p>`;
     else html += `<p>Abwesenheits-Änderungen mit Spieltags-Bezug:</p>`;
 
-    html += `<table cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:13px">`;
+    html += `<table cellpadding="4" cellspacing="0" style="${s.table}">`;
     for (const e of abwEntries) {
-      html += `<tr><td style="color:#c00;padding-right:8px">${escapeHtml(e.alterWert)}</td><td>→</td><td style="color:#080;padding-left:8px">${escapeHtml(e.neuerWert)}</td></tr>`;
+      html += `<tr><td style="${s.red};padding-right:8px">${escapeHtml(e.alterWert)}</td><td>→</td><td style="${s.green};padding-left:8px">${escapeHtml(e.neuerWert)}</td></tr>`;
     }
     html += `</table>`;
 
@@ -1024,11 +1025,11 @@ function sendChangeNotification(
       const status = a.warAufgestellt
         ? (a.warFinal ? 'War aufgestellt (Final → Geplant) — Nachplanung nötig!' : 'War aufgestellt — Nachplanung nötig!')
         : 'Stand als Ersatz zur Verfügung';
-      html += `<p style="margin:2px 0 2px 20px;font-size:13px">${escapeHtml(context)}<br><span style="color:#c00">${escapeHtml(a.spielerName)}: ${status}</span></p>`;
+      html += `<p style="margin:2px 0 2px 20px;font-size:13px">${escapeHtml(context)}<br><span style="${s.red}">${escapeHtml(a.spielerName)}: ${status}</span></p>`;
     }
   }
 
-  html += `<p style="margin-top:16px;color:#888">Viele Grüße,<br>Dein Einsatzplaner-Team</p></body></html>`;
+  html += `<p style="${s.footer}">Viele Grüße,<br>Dein Einsatzplaner-Team</p></body></html>`;
 
   for (const email of empfaenger) {
     MailApp.sendEmail({ to: email, subject, htmlBody: html });
@@ -1086,19 +1087,20 @@ function buildFullColumnList(oldR: SaisonRowSnapshot, newR: SaisonRowSnapshot, c
 
 /** 2-Zeilen-Tabelle für geänderte Spieltage: alt (rot) / neu (grün). */
 function saisonRowTableHtml(typ: string, datum: string, cols: { label: string; oldVal: string; newVal: string }[]): string {
-  let h = `<p style="margin:12px 0 4px 0;font-weight:bold;font-size:15px">${escapeHtml(datum)} (${typ})</p>`;
-  h += `<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px">`;
-  h += '<tr style="background:#eee">';
-  for (const c of cols) h += `<th>${escapeHtml(c.label)}</th>`;
+  const s = emailStyles();
+  let h = `<p style="${s.header}">${escapeHtml(datum)} (${typ})</p>`;
+  h += `<table border="1" cellpadding="4" cellspacing="0" style="${s.table}">`;
+  h += `<tr>`;
+  for (const c of cols) h += `<th style="${s.th}">${escapeHtml(c.label)}</th>`;
   h += '</tr><tr>';
   for (const c of cols) {
     const changed = c.oldVal !== c.newVal;
-    h += `<td${changed ? ' style="color:#c00"' : ''}>${escapeHtml(c.oldVal || '-')}</td>`;
+    h += `<td style="${changed ? s.red + ';' : ''}${s.td}">${escapeHtml(c.oldVal || '-')}</td>`;
   }
   h += '</tr><tr>';
   for (const c of cols) {
     const changed = c.oldVal !== c.newVal;
-    h += `<td${changed ? ' style="color:#080"' : ''}>${escapeHtml(c.newVal || '-')}</td>`;
+    h += `<td style="${changed ? s.green + ';' : ''}${s.td}">${escapeHtml(c.newVal || '-')}</td>`;
   }
   h += '</tr></table>';
   return h;
@@ -1109,15 +1111,16 @@ function saisonSingleRowTableHtml(typ: string, datum: string, cols: { label: str
   const displayCols = cols.filter(c => (isNew && c.newVal) || (!isNew && c.oldVal));
   if (displayCols.length === 0) return '';
 
-  const color = isNew ? '#080' : '#c00';
-  let h = `<p style="margin:12px 0 4px 0;font-weight:bold;font-size:15px">${escapeHtml(datum)} (${typ})</p>`;
-  h += `<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px">`;
-  h += '<tr style="background:#eee">';
-  for (const c of displayCols) h += `<th>${escapeHtml(c.label)}</th>`;
+  const s = emailStyles();
+  const color = isNew ? s.green : s.red;
+  let h = `<p style="${s.header}">${escapeHtml(datum)} (${typ})</p>`;
+  h += `<table border="1" cellpadding="4" cellspacing="0" style="${s.table}">`;
+  h += '<tr>';
+  for (const c of displayCols) h += `<th style="${s.th}">${escapeHtml(c.label)}</th>`;
   h += '</tr><tr>';
   for (const c of displayCols) {
     const v = isNew ? c.newVal : c.oldVal;
-    h += `<td style="color:${color}">${escapeHtml(v || '-')}</td>`;
+    h += `<td style="${color};${s.td}">${escapeHtml(v || '-')}</td>`;
   }
   h += '</tr></table>';
   return h;
