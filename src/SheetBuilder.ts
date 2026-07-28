@@ -198,6 +198,13 @@ function buildSaisonSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.She
   const cfRules: GoogleAppsScript.Spreadsheet.ConditionalFormatRule[] = [];
   const firstPlayerCol = saisonSpielerCol(0);
 
+  // Status: Grün = Final, Orange = Geplant
+  const statusRange = sheet.getRange(2, saisonStatusCol(), lastRow - 1, 1);
+  cfRules.push(
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Final').setBackground('#D9EAD3').setRanges([statusRange]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Geplant').setBackground('#FCE5CD').setRanges([statusRange]).build(),
+  );
+
   // Ersatzspieler-Spalten: gelb nur wenn Zelle gefüllt ist
   cfRules.push(
     SpreadsheetApp.newConditionalFormatRule()
