@@ -36,7 +36,7 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['', '', ''],
     ['SHEETS IM ÜBERBLICK', '', ''],
     ['Spieler', 'Stammdaten', 'Name, Email, Rang, Aktiv, Aufstellungsänderungen melden, Rolle'],
-    ['Abwesenheiten', 'Von Spielern gepflegt', 'Spieler, Von, Bis, Kommentar, Hinweis (Validierung)'],
+    ['Abwesenheiten', 'Von Spielern gepflegt', 'Spieler, Von, Bis, Kommentar, Validierungsmeldungen'],
     ['Saison', 'Zentrale Übersicht, ein Tag pro Zeile', 'Datum, Wochentag, Gegner, Startzeit, Heim/Auswärts, Spieler-Spalten, Ersatz, Status, Kommentar, Validierungsmeldungen'],
     ['Änderungslog', 'Automatisch (versteckt)', 'Protokolliert alle Änderungen. Snapshot-Diff für Abwesenheiten/Spieler (Cut+Paste wird erkannt).'],
     ['', '', ''],
@@ -111,7 +111,7 @@ function buildSpielerSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.Sh
 
 function buildAbwesenheitenSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.Sheet {
   const sheet = getOrCreateSheet(SHEET_NAMES.ABWESENHEITEN);
-  const headers = ['Spieler', 'Abwesenheit von', 'Abwesenheit bis', 'Kommentar', 'Hinweis'];
+  const headers = ['Spieler', 'Abwesenheit von', 'Abwesenheit bis', 'Kommentar', 'Validierungsmeldungen'];
   const numCols = headers.length;
   sheet.getRange(1, 1, 1, numCols).setValues([headers]); formatHeader(sheet, numCols);
 
