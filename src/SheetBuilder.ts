@@ -54,7 +54,7 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['Ersatzspieler 1–3', 'Freitext', 'Gastspieler, zählen als Einzel+Doppel'],
     ['Status', 'Geplant / Final', 'Bei Gegner-Eintrag automatisch Geplant. Orange = Geplant, Grün = Final.'],
     ['Kommentar', 'Freitext', 'Zusätzliche Infos für Spieler (Treffpunkt, Besonderheiten). In Änderungsmails enthalten.'],
-    ['Validierungsmeldungen', 'Automatisch', 'Wird nicht in Zellen geschrieben, sondern als Notiz an der Status-Zelle angezeigt. Nicht per Mail.'],
+    ['Validierungsmeldungen', 'Automatisch', `Mindestens ${format.einzel} Einzel + ${format.doppel} Doppel, max. 6 gesamt. Nicht per Mail.`],
 
 
     ['', '', ''],
