@@ -44,6 +44,7 @@ function sendEinsatzEmails(): void {
     const startzeit = formatStartzeit(startVal);
 
     const heimAuswaerts = String(saisonSheet.getRange(row, saisonHeimAuswaertsCol()).getValue() || '').trim();
+    const kommentar = String(saisonSheet.getRange(row, saisonKommentarCol()).getValue() || '').trim();
     const datumStr = Utilities.formatDate(datum, 'Europe/Berlin', 'dd.MM.yyyy');
 
     const key = dateKey(datum);
@@ -90,7 +91,7 @@ function sendEinsatzEmails(): void {
       einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: ersatzArt, besondereUnterstuetzung: false });
     }
 
-    spielplanRows.push([datumStr, startzeit, heimAuswaerts, gegner, matchPlayers.join('<br>')]);
+    spielplanRows.push([datumStr, startzeit, heimAuswaerts, gegner, matchPlayers.join('<br>'), kommentar]);
   }
 
   const spielerMap = buildSpielerMap();
@@ -125,10 +126,10 @@ function formatStartzeit(val: unknown): string {
 function buildHtmlTable(rows: string[][]): string {
   if (rows.length === 0) return '';
   let html = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px;width:100%">';
-  html += '<tr style="background:#4A90D9;color:white"><th>Datum</th><th>Zeit</th><th>Ort</th><th>Gegner</th><th>Aufstellung</th></tr>';
+  html += '<tr style="background:#4A90D9;color:white"><th>Datum</th><th>Zeit</th><th>Ort</th><th>Gegner</th><th>Aufstellung</th><th>Kommentar</th></tr>';
   for (const r of rows) {
     const aufstellung = r[4].replace(/→/g, '—');
-    html += `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td style="font-size:14px">${aufstellung}</td></tr>`;
+    html += `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td style="font-size:14px">${aufstellung}</td><td>${escapeHtml(r[5] || '')}</td></tr>`;
   }
   html += '</table>';
   return html;
