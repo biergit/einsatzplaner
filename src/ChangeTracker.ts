@@ -216,7 +216,8 @@ function rebuildAbwesenheitenInSaison(ss: GoogleAppsScript.Spreadsheet.Spreadshe
     const refreshedAllAbw = buildAbwesenheitenIndex(ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN)!);
     const validierungValues: string[][] = [];
     for (let r = 0; r < numRows; r++) {
-      validierungValues.push([computeValidierung(allPlayerCols[r], dates[r], aktiveSpieler, refreshedAllAbw, saisonSheet, r + 2)]);
+      const gegner = String(gegnerCols[r][0] || '').trim();
+      validierungValues.push([gegner ? computeValidierung(allPlayerCols[r], dates[r], aktiveSpieler, refreshedAllAbw, saisonSheet, r + 2) : '']);
     }
     saisonSheet.getRange(2, saisonValidierungCol(), numRows, 1).setValues(validierungValues);
   }
