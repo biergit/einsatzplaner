@@ -1,5 +1,7 @@
 # Einsatzplaner
 
+> Google Apps Script zur Verwaltung eines Tischtennis-Teams: Abwesenheiten, Spieltermine, automatische Einsatzpläne nach Rang & Verfügbarkeit, HTML-Mails mit Vorher-/Nachher-Diff.
+
 Google Apps Script zur Verwaltung eines Tischtennis-Teams. Erfasst Abwesenheiten, Spieltermine und generiert automatisch Einsatzpläne basierend auf Spielerrängen und Verfügbarkeit.
 
 ## Setup
