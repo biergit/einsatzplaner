@@ -936,7 +936,9 @@ function sendChangeNotification(
   if (hasSaison && saisonDiffs) {
     // ── Sammle alle betroffenen Spieltage ──
     const count = saisonDiffs.modified.length + saisonDiffs.added.length + saisonDiffs.deleted.length;
-    html += `<p>folgende <b>${count}</b> Spieltag${count !== 1 ? 'e' : ''} wurde${count !== 1 ? 'n' : ''} aktualisiert:</p>`;
+    html += count === 1
+      ? `<p>folgender Spieltag wurde aktualisiert:</p>`
+      : `<p>folgende <b>${count}</b> Spieltage wurden aktualisiert:</p>`;
 
     // ── Geänderte Spieltage (2-Zeilen-Tabelle: alt/rot, neu/grün) ──
     for (const mod of saisonDiffs.modified) {
