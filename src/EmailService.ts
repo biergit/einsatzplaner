@@ -164,8 +164,9 @@ function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohne
 
   const s = emailStyles();
 
-  let rows = '';
+  let abschnitte = '';
   for (const { name, einsaetze } of ohneEmail) {
+    let rows = '';
     for (const e of einsaetze.sort((a, b) => a.datum.localeCompare(b.datum))) {
       const h = e.heimAuswaerts || '';
       const z = e.startzeit ? ` ${e.startzeit}` : '';
@@ -173,21 +174,22 @@ function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohne
 <td style="${s.td}">${escapeHtml(e.datum)}${escapeHtml(z)}</td>
 <td style="${s.td}">${escapeHtml(h)}</td>
 <td style="${s.td}">${escapeHtml(e.gegner)}</td>
-<td style="${s.td}">${escapeHtml(name)}</td>
 <td style="${s.td}">${escapeHtml(e.einsatzart)}</td>
 <td style="${s.td}">${escapeHtml(e.hinweis)}</td>
 </tr>`;
     }
+    abschnitte += `<p style="${s.header}">${escapeHtml(name)}</p>
+<table border="1" cellpadding="4" cellspacing="0" style="${s.table};width:100%">
+<tr><th style="${s.th}">Datum / Zeit</th><th style="${s.th}">Ort</th><th style="${s.th}">Gegner</th><th style="${s.th}">Einsatzart</th><th style="${s.th}">Hinweis</th></tr>
+${rows}
+</table>`;
   }
 
   const html = `<html><body style="${s.body}">
 <p>Hallo,</p>
 <p>Es wurden soeben Spielpläne finalisiert und Einsatz-Mails verschickt.<br>
-Folgende eingesetzte Spieler haben keine E-Mail-Adresse und konnten nicht automatisch benachrichtigt werden:</p>
-<table border="1" cellpadding="4" cellspacing="0" style="${s.table};width:100%">
-<tr><th style="${s.th}">Datum / Zeit</th><th style="${s.th}">Ort</th><th style="${s.th}">Gegner</th><th style="${s.th}">Spieler</th><th style="${s.th}">Einsatzart</th><th style="${s.th}">Hinweis</th></tr>
-${rows}
-</table>
+Folgende eingesetzte Spieler haben keine hinterlegte E-Mail-Adresse:</p>
+${abschnitte}
 <p style="margin-top:12px">Bitte informiere sie persönlich über ihre Einsätze.</p>
 <p style="${s.footer}">Viele Grüße,<br>Dein Einsatzplaner-Team</p>
 </body></html>`;
