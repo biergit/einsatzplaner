@@ -136,6 +136,20 @@ function buildHtmlTable(rows: string[][]): string {
   return html;
 }
 
+/** Gemeinsame CSS-Styles für alle HTML-Mails. */
+function emailStyles() {
+  return {
+    body: 'font-family:Arial,sans-serif;font-size:14px;color:#333',
+    table: 'border-collapse:collapse;font-size:13px',
+    th: 'background:#4A90D9;color:#fff;text-align:left;padding:6px',
+    td: 'padding:4px 6px;vertical-align:top',
+    footer: 'margin-top:16px;color:#888',
+    header: 'margin:12px 0 4px 0;font-weight:bold;font-size:15px',
+    red: 'color:#c00',
+    green: 'color:#080',
+  };
+}
+
 function readSpielerNames(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string[] {
   const s = ss.getSheetByName(SHEET_NAMES.SPIELER);
   if (!s) return [];
@@ -148,9 +162,7 @@ function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohne
   const kap = getKapitaenEmail(ss);
   if (!kap) return;
 
-  const style = 'font-family:Arial,sans-serif;font-size:14px;color:#333';
-  const thStyle = 'background:#4A90D9;color:#fff;text-align:left;padding:6px';
-  const tdStyle = 'padding:6px;vertical-align:top';
+  const s = emailStyles();
 
   let rows = '';
   for (const { name, einsaetze } of ohneEmail) {
@@ -158,26 +170,26 @@ function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohne
       const h = e.heimAuswaerts || '';
       const z = e.startzeit ? ` ${e.startzeit}` : '';
       rows += `<tr>
-<td style="${tdStyle}">${escapeHtml(e.datum)}${escapeHtml(z)}</td>
-<td style="${tdStyle}">${escapeHtml(h)}</td>
-<td style="${tdStyle}">${escapeHtml(e.gegner)}</td>
-<td style="${tdStyle}">${escapeHtml(name)}</td>
-<td style="${tdStyle}">${escapeHtml(e.einsatzart)}</td>
-<td style="${tdStyle}">${escapeHtml(e.hinweis)}</td>
+<td style="${s.td}">${escapeHtml(e.datum)}${escapeHtml(z)}</td>
+<td style="${s.td}">${escapeHtml(h)}</td>
+<td style="${s.td}">${escapeHtml(e.gegner)}</td>
+<td style="${s.td}">${escapeHtml(name)}</td>
+<td style="${s.td}">${escapeHtml(e.einsatzart)}</td>
+<td style="${s.td}">${escapeHtml(e.hinweis)}</td>
 </tr>`;
     }
   }
 
-  const html = `<html><body style="${style}">
+  const html = `<html><body style="${s.body}">
 <p>Hallo,</p>
 <p>Es wurden soeben Spielpläne finalisiert und Einsatz-Mails verschickt.<br>
 Folgende eingesetzte Spieler haben keine E-Mail-Adresse und konnten nicht automatisch benachrichtigt werden:</p>
-<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:13px;width:100%">
-<tr><th style="${thStyle}">Datum / Zeit</th><th style="${thStyle}">Ort</th><th style="${thStyle}">Gegner</th><th style="${thStyle}">Spieler</th><th style="${thStyle}">Einsatzart</th><th style="${thStyle}">Hinweis</th></tr>
+<table border="1" cellpadding="4" cellspacing="0" style="${s.table};width:100%">
+<tr><th style="${s.th}">Datum / Zeit</th><th style="${s.th}">Ort</th><th style="${s.th}">Gegner</th><th style="${s.th}">Spieler</th><th style="${s.th}">Einsatzart</th><th style="${s.th}">Hinweis</th></tr>
 ${rows}
 </table>
 <p style="margin-top:12px">Bitte informiere sie persönlich über ihre Einsätze.</p>
-<p style="color:#888">Viele Grüße,<br>Dein Einsatzplaner-Team</p>
+<p style="${s.footer}">Viele Grüße,<br>Dein Einsatzplaner-Team</p>
 </body></html>`;
 
   MailApp.sendEmail({ to: kap, subject: 'Einsatzplaner – Spieler ohne hinterlegte E-Mail-Adresse', htmlBody: html });
