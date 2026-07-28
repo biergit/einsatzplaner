@@ -589,7 +589,20 @@ function flushPendingChanges(): void {
   saveSheetSnapshots(ss);
 
   // ── 7. Mail-Benachrichtigung (in-memory, kein Sheet-Readback) ──
-  if (logEntries.length === 0) return;
+  if (logEntries.length === 0) {
+    Logger.log('flushPendingChanges: keine Änderungen');
+    return;
+  }
+
+  const saisonMod = saisonDiffs?.modified.length ?? 0;
+  const saisonAdd = saisonDiffs?.added.filter(a => a.status === 'Final').length ?? 0;
+  const saisonDel = saisonDiffs?.deleted.length ?? 0;
+  const skippedAdd = (saisonDiffs?.added.length ?? 0) - saisonAdd;
+  const abwCount = logEntries.filter(e => e.sheetName === SHEET_NAMES.ABWESENHEITEN).length;
+  const spCount = logEntries.filter(e => e.sheetName === SHEET_NAMES.SPIELER).length;
+  Logger.log(`flushPendingChanges: ${logEntries.length} Einträge ` +
+    `(Saison: ${saisonMod} mod, ${saisonAdd} neu, ${saisonDel} del, ${skippedAdd} Geplant übersprungen | ` +
+    `Abw: ${abwCount} | Spieler: ${spCount})`);
 
   let abwAffected: AbwAffectedEntry[] | null = null;
   if (abwAffectedRaw) {
