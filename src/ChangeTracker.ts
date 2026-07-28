@@ -299,8 +299,8 @@ function validateAbwesenheitRow(sheet: GoogleAppsScript.Spreadsheet.Sheet, row: 
 
   if (!von || !bis) {
     fehler.push('Von- und Bis-Datum erforderlich');
-  } else if (von.getTime() >= bis.getTime()) {
-    fehler.push('Von-Datum muss vor dem Bis-Datum liegen');
+  } else if (von.getTime() > bis.getTime()) {
+    fehler.push('Von-Datum darf nicht nach dem Bis-Datum liegen');
   }
 
   sheet.getRange(row, COL_ABWESENHEITEN.Validierung).setValue(fehler.join(' | '));
