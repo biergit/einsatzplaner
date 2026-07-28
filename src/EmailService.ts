@@ -265,19 +265,20 @@ function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], spielp
 
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:14px">
 <p>Hallo ${spieler.name},</p>
-<p>hier ist dein <b>persönlicher Einsatzplan</b>:</p>
+<p>hier ist dein persönlicher</p>
+<p><b>Einsatzplan<b></p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px">
 <tr style="background:#4A90D9;color:white"><th>Datum / Zeit</th><th>Ort</th><th>Gegner</th><th>Einsatzart</th>${kmtHead}</tr>
 ${personliche}
 </table>
-<p>─── <b>GESAMTSPIELPLAN</b> ───</p>
+<p><b>GESAMTSPIELPLAN</b></p>
 ${htmlTable}
 <p>Viele Grüße,<br>Dein Einsatzplaner-Team</p>
 </body></html>`;
 
   MailApp.sendEmail({
     to: spieler.email,
-    subject: 'Dein Einsatzplan – Tischtennis',
+    subject: "Neuer ${SHEET_CONFIG.einstellungen.teamName} - Einsatzplan",
     htmlBody: html,
   });
 }
