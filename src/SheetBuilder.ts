@@ -56,7 +56,6 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['Kommentar', 'Freitext', 'Zusätzliche Infos für Spieler (Treffpunkt, Besonderheiten). In Änderungsmails enthalten.'],
     ['Validierungsmeldungen', 'Automatisch', `Mindestens ${format.einzel} Einzel + ${format.doppel} Doppel, max. 6 gesamt. Nicht per Mail.`],
 
-
     ['', '', ''],
     ['MENÜ', '', ''],
     ['Sheet neu aufbauen', 'Alles löschen und neu bauen', 'Keine E-Mails'],
@@ -72,7 +71,7 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
   const numCols = 3;
   sheet.getRange(1, 1, rows.length, numCols).setValues(rows);
   sheet.getRange(1, 1, 2, numCols).setFontWeight('bold').setFontSize(14).setBackground('#E8F0FE');
-  for (const r of [4, 10, 14, 25, 31]) {
+  for (const r of [4, 10, 14, 26, 32]) {
     sheet.getRange(r, 1, 1, numCols).setFontWeight('bold').setFontSize(11).setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
   }
   sheet.setFrozenRows(0);
