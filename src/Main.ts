@@ -3,12 +3,14 @@
 function onOpen(): void {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('Einsatzplaner')
-    .addItem('Sheet neu aufbauen', 'menuSheetNeuAufbauen')
-    .addSeparator()
-    .addItem('Daten exportieren', 'menuDatenExportieren')
     .addItem('Aufstellungen generieren', 'menuAufstellungenGenerieren')
     .addSeparator()
     .addItem('Finalisieren + Emails senden', 'menuFinalisierenUndSenden')
+    .addSeparator()
+    .addItem('Daten exportieren', 'menuDatenExportieren')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('Danger Zone')
+      .addItem('Sheet neu aufbauen', 'menuSheetNeuAufbauen'))
     .addToUi();
 }
 
