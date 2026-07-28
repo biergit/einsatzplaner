@@ -214,11 +214,10 @@ function rebuildAbwesenheitenInSaison(ss: GoogleAppsScript.Spreadsheet.Spreadshe
 
   if (playerChanged || statusChanged) {
     const refreshedAllAbw = buildAbwesenheitenIndex(ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN)!);
-    const hinweisValues: string[][] = [];
     for (let r = 0; r < numRows; r++) {
-      hinweisValues.push([computeHinweis(allPlayerCols[r], dates[r], aktiveSpieler, refreshedAllAbw, saisonSheet, r + 2)]);
+      const hinweis = computeHinweis(allPlayerCols[r], dates[r], aktiveSpieler, refreshedAllAbw, saisonSheet, r + 2);
+      saisonSheet.getRange(r + 2, saisonStatusCol()).setNote(hinweis || null);
     }
-    saisonSheet.getRange(2, saisonHinweisCol(), numRows, 1).setValues(hinweisValues);
   }
 
   // Betroffene Spieltage für die spätere Mail-Anreicherung speichern
@@ -854,7 +853,7 @@ function validateAndUpdateSaisonRow(editedRange: GoogleAppsScript.Spreadsheet.Ra
 
   const gegner = String(sheet.getRange(row, saisonGegnerCol()).getValue() || '').trim();
   if (!gegner) {
-    sheet.getRange(row, saisonHinweisCol()).setValue('');
+    sheet.getRange(row, saisonStatusCol()).setNote(null);
     return;
   }
 
@@ -867,7 +866,7 @@ function validateAndUpdateSaisonRow(editedRange: GoogleAppsScript.Spreadsheet.Ra
   const allAbw = buildAbwesenheitenIndex(ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN)!);
   const playerRow = sheet.getRange(row, saisonSpielerCol(0), 1, aktiveSpieler.length).getValues()[0] as string[];
   const hinweis = computeHinweis(playerRow, datum, aktiveSpieler, allAbw, sheet, row);
-  sheet.getRange(row, saisonHinweisCol()).setValue(hinweis);
+  sheet.getRange(row, saisonStatusCol()).setNote(hinweis || null);
 }
 
 // ─── Änderungslog-Blatt (unverändert) ──────────────────────────────────────

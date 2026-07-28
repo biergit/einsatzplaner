@@ -37,7 +37,7 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['SHEETS IM ÜBERBLICK', '', ''],
     ['Spieler', 'Stammdaten', 'Name, Email, Rang, Aktiv, Aufstellungsänderungen melden, Rolle'],
     ['Abwesenheiten', 'Von Spielern gepflegt', 'Spieler, Von, Bis, Kommentar, Hinweis (Validierung)'],
-    ['Saison', 'Zentrale Übersicht, ein Tag pro Zeile', 'Datum, Wochentag, Gegner, Startzeit, Heim/Auswärts, Spieler-Spalten, Ersatz, Status, Kommentar, Hinweis (Validierung)'],
+    ['Saison', 'Zentrale Übersicht, ein Tag pro Zeile', 'Datum, Wochentag, Gegner, Startzeit, Heim/Auswärts, Spieler-Spalten, Ersatz, Status, Kommentar, Validierungsmeldungen'],
     ['Änderungslog', 'Automatisch (versteckt)', 'Protokolliert alle Änderungen. Snapshot-Diff für Abwesenheiten/Spieler (Cut+Paste wird erkannt).'],
     ['', '', ''],
     ['SPIELER-SPALTEN', '', ''],
@@ -54,7 +54,9 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['Ersatzspieler 1–3', 'Freitext', 'Gastspieler, zählen als Einzel+Doppel'],
     ['Status', 'Geplant / Final', 'Bei Gegner-Eintrag automatisch Geplant. Orange = Geplant, Grün = Final.'],
     ['Kommentar', 'Freitext', 'Zusätzliche Infos für Spieler (Treffpunkt, Besonderheiten). In Änderungsmails enthalten.'],
-    ['Hinweis (Validierungsmeldungen)', 'Automatisch validiert', `Mindestens ${format.einzel} Einzel + ${format.doppel} Doppel, max. 6 gesamt. Wird nicht per Mail versendet.`],
+    ['Validierungsmeldungen', 'Automatisch', 'Wird nicht in Zellen geschrieben, sondern als Notiz an der Status-Zelle angezeigt. Nicht per Mail.'],
+
+
     ['', '', ''],
     ['MENÜ', '', ''],
     ['Sheet neu aufbauen', 'Alles löschen und neu bauen', 'Keine E-Mails'],
@@ -155,7 +157,7 @@ function buildSaisonSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.She
 
   const headers: string[] = ['Datum', 'Wochentag', 'Gegner', 'Startzeit', 'Heim / Auswärts'];
   for (const s of config.spieler) headers.push(s.name);
-  headers.push('Ersatzspieler 1', 'Ersatzspieler 2', 'Ersatzspieler 3', 'Status', 'Kommentar', 'Hinweis (Validierungsmeldungen)');
+  headers.push('Ersatzspieler 1', 'Ersatzspieler 2', 'Ersatzspieler 3', 'Status', 'Kommentar', 'Validierungsmeldungen');
 
   sheet.getRange(1, 1, 1, numCols).setValues([headers]); formatHeader(sheet, numCols);
 
