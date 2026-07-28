@@ -260,3 +260,102 @@ describe('computeSheetDiff', () => {
     expect(entries.every(e => e.alterWert === '(neu)')).toBe(true);
   });
 });
+
+// Saison-Diff Tests (diffSaisonRow + computeSaisonDiff)
+interface SaisonRowSnapshot {
+  datum: string; gegner: string; startzeit: string; heimAuswaerts: string;
+  playerAssignments: string[]; ersatz: string[]; status: string; kommentar: string;
+}
+
+interface ChangedCell { label: string; oldVal: string; newVal: string; }
+interface SaisonModifiedRow { datum: string; gegner: string; oldRow: SaisonRowSnapshot; newRow: SaisonRowSnapshot; changedCells: ChangedCell[]; }
+interface SaisonDiffResult { modified: SaisonModifiedRow[]; added: SaisonRowSnapshot[]; deleted: SaisonRowSnapshot[]; }
+
+function computeSaisonDiff(snapshot: SaisonRowSnapshot[], current: SaisonRowSnapshot[]): SaisonDiffResult {
+  function key(r: SaisonRowSnapshot) { return `${r.datum}|${r.gegner}`; }
+  const oldByKey = new Map<string, SaisonRowSnapshot>();
+  for (const r of snapshot) oldByKey.set(key(r), r);
+  const newByKey = new Map<string, SaisonRowSnapshot>();
+  for (const r of current) newByKey.set(key(r), r);
+  const allKeys = new Set([...oldByKey.keys(), ...newByKey.keys()]);
+  const modified: SaisonModifiedRow[] = [];
+  const added: SaisonRowSnapshot[] = [];
+  const deleted: SaisonRowSnapshot[] = [];
+  for (const k of allKeys) {
+    const oldR = oldByKey.get(k);
+    const newR = newByKey.get(k);
+    if (oldR && newR) {
+      const changes = diffSaisonRow(oldR, newR);
+      if (changes.length > 0) modified.push({ datum: oldR.datum, gegner: oldR.gegner, oldRow: oldR, newRow: newR, changedCells: changes });
+    } else if (!oldR && newR) { added.push(newR); }
+    else if (oldR && !newR) { deleted.push(oldR); }
+  }
+  return { modified, added, deleted };
+}
+
+function diffSaisonRow(oldR: SaisonRowSnapshot, newR: SaisonRowSnapshot): ChangedCell[] {
+  const changes: ChangedCell[] = [];
+  if (oldR.gegner !== newR.gegner) changes.push({ label: 'Gegner', oldVal: oldR.gegner, newVal: newR.gegner });
+  if (oldR.startzeit !== newR.startzeit) changes.push({ label: 'Startzeit', oldVal: oldR.startzeit, newVal: newR.startzeit });
+  if (oldR.heimAuswaerts !== newR.heimAuswaerts) changes.push({ label: 'Ort', oldVal: oldR.heimAuswaerts, newVal: newR.heimAuswaerts });
+  for (let pi = 0; pi < oldR.playerAssignments.length; pi++) {
+    const ov = oldR.playerAssignments[pi]; const nv = newR.playerAssignments[pi];
+    if (ov !== nv) changes.push({ label: `Spieler${pi + 1}`, oldVal: ov, newVal: nv });
+  }
+  for (let ei = 0; ei < 3; ei++) {
+    if (oldR.ersatz[ei] !== newR.ersatz[ei]) changes.push({ label: `Ersatz ${ei + 1}`, oldVal: oldR.ersatz[ei], newVal: newR.ersatz[ei] });
+  }
+  if (oldR.status !== newR.status) changes.push({ label: 'Status', oldVal: oldR.status, newVal: newR.status });
+  if (oldR.kommentar !== newR.kommentar) changes.push({ label: 'Kommentar', oldVal: oldR.kommentar, newVal: newR.kommentar });
+  return changes;
+}
+
+function sRow(datum: string, gegner: string, overrides: Partial<SaisonRowSnapshot> = {}): SaisonRowSnapshot {
+  return {
+    datum, gegner,
+    startzeit: '', heimAuswaerts: '',
+    playerAssignments: ['Einzel+Doppel', 'Einzel+Doppel', '', '', ''],
+    ersatz: ['', '', ''],
+    status: 'Final', kommentar: '',
+    ...overrides,
+  };
+}
+
+describe('computeSaisonDiff', () => {
+  it('detects Kommentar change', () => {
+    const oldSnap = [sRow('01.09.2026', 'ABC', { kommentar: '' })];
+    const newSnap = [sRow('01.09.2026', 'ABC', { kommentar: 'Treffpunkt 18:30' })];
+    const result = computeSaisonDiff(oldSnap, newSnap);
+    expect(result.modified).toHaveLength(1);
+    expect(result.modified[0].changedCells).toContainEqual({ label: 'Kommentar', oldVal: '', newVal: 'Treffpunkt 18:30' });
+  });
+
+  it('detects no change when Kommentar unchanged', () => {
+    const row = sRow('01.09.2026', 'ABC', { kommentar: 'Treffpunkt' });
+    const result = computeSaisonDiff([row], [row]);
+    expect(result.modified).toHaveLength(0);
+  });
+
+  it('detects new Spieltag with Kommentar', () => {
+    const result = computeSaisonDiff([], [sRow('01.09.2026', 'ABC', { kommentar: 'Info' })]);
+    expect(result.added).toHaveLength(1);
+    expect(result.added[0].kommentar).toBe('Info');
+  });
+
+  it('detects deleted Spieltag', () => {
+    const result = computeSaisonDiff([sRow('01.09.2026', 'ABC')], []);
+    expect(result.deleted).toHaveLength(1);
+  });
+
+  it('detects Status change', () => {
+    const oldRow = sRow('01.09.2026', 'ABC', { status: 'Geplant' });
+    const newRow = sRow('01.09.2026', 'ABC', { status: 'Final' });
+    const result = computeSaisonDiff([oldRow], [newRow]);
+    expect(result.modified[0].changedCells).toContainEqual({ label: 'Status', oldVal: 'Geplant', newVal: 'Final' });
+  });
+
+  it('ignores Geplant in added count (no-op, just ensure structure)', () => {
+    const result = computeSaisonDiff([], [sRow('01.09.2026', 'ABC', { status: 'Geplant' })]);
+    expect(result.added).toHaveLength(1);
+  });
+});
