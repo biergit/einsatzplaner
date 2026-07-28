@@ -7,7 +7,6 @@ interface EinsatzInfo {
   heimAuswaerts: string;
   einsatzart: string;
   besondereUnterstuetzung: boolean;
-  hinweis: string;
 }
 
 function sendEinsatzEmails(): void {
@@ -45,7 +44,6 @@ function sendEinsatzEmails(): void {
     const startzeit = formatStartzeit(startVal);
 
     const heimAuswaerts = String(saisonSheet.getRange(row, saisonHeimAuswaertsCol()).getValue() || '').trim();
-    const hinweisText = String(saisonSheet.getRange(row, saisonHinweisCol()).getValue() || '').trim();
     const datumStr = Utilities.formatDate(datum, 'Europe/Berlin', 'dd.MM.yyyy');
 
     const key = dateKey(datum);
@@ -70,7 +68,7 @@ function sendEinsatzEmails(): void {
         matchPlayers.push(`${name} → ${val}`);
       }
       if (!einsaetzeProSpieler[name]) einsaetzeProSpieler[name] = [];
-      einsaetzeProSpieler[name].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: val, besondereUnterstuetzung: bu, hinweis: hinweisText });
+      einsaetzeProSpieler[name].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: val, besondereUnterstuetzung: bu });
       if (val === 'Einzel+Doppel') { spEinzel++; spDoppel++; }
       else if (val === 'Einzel') spEinzel++;
       else if (val === 'Doppel') spDoppel++;
@@ -89,7 +87,7 @@ function sendEinsatzEmails(): void {
       else { ersatzArt = 'Einzel+Doppel (Ersatz)'; }
       matchPlayers.push(`<span style="background:#FFF7E0;padding:1px 4px">${eName} → ${ersatzArt}</span>`);
       if (!einsaetzeProSpieler[eName]) einsaetzeProSpieler[eName] = [];
-      einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: ersatzArt, besondereUnterstuetzung: false, hinweis: hinweisText });
+      einsaetzeProSpieler[eName].push({ datum: datumStr, gegner, startzeit, heimAuswaerts, einsatzart: ersatzArt, besondereUnterstuetzung: false });
     }
 
     spielplanRows.push([datumStr, startzeit, heimAuswaerts, gegner, matchPlayers.join('<br>')]);
@@ -175,12 +173,11 @@ function sendOhneEmailHinweis(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, ohne
 <td style="${s.td}">${escapeHtml(h)}</td>
 <td style="${s.td}">${escapeHtml(e.gegner)}</td>
 <td style="${s.td}">${escapeHtml(e.einsatzart)}</td>
-<td style="${s.td}">${escapeHtml(e.hinweis)}</td>
 </tr>`;
     }
     abschnitte += `<p style="${s.header}">${escapeHtml(name)}</p>
 <table border="1" cellpadding="4" cellspacing="0" style="${s.table};width:100%">
-<tr><th style="${s.th}">Datum / Zeit</th><th style="${s.th}">Ort</th><th style="${s.th}">Gegner</th><th style="${s.th}">Einsatzart</th><th style="${s.th}">Hinweis</th></tr>
+<tr><th style="${s.th}">Datum / Zeit</th><th style="${s.th}">Ort</th><th style="${s.th}">Gegner</th><th style="${s.th}">Einsatzart</th></tr>
 ${rows}
 </table>`;
   }

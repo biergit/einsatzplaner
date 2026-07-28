@@ -46,8 +46,12 @@ function saisonStatusCol(): number {
   return saisonErsatzColStart() + 3;
 }
 
-function saisonHinweisCol(): number {
+function saisonKommentarCol(): number {
   return saisonStatusCol() + 1;
+}
+
+function saisonHinweisCol(): number {
+  return saisonStatusCol() + 2;
 }
 
 function saisonColCount(): number {
