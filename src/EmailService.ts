@@ -207,7 +207,7 @@ ${abschnitte}
 <p style="${s.footer}">Viele Grüße,<br>Dein Einsatzplaner-Team</p>
 </body></html>`;
 
-  MailApp.sendEmail({ to: kap, subject: 'Einsatzplaner – Spieler ohne hinterlegte E-Mail-Adresse', htmlBody: html });
+  MailApp.sendEmail({ to: kap, subject: `${SHEET_CONFIG.einstellungen.teamName}-Einsatzplaner – Spieler ohne hinterlegte E-Mail-Adresse`, htmlBody: html });
   Logger.log(`sendOhneEmailInfo: Mail an Kapitän (${kap}) für ${ohneEmail.length} Spieler ohne E-Mail`);
 }
 
