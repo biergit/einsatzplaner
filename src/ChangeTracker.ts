@@ -935,7 +935,34 @@ function sendChangeNotification(
   if (visibleSaisonCount === 0 && abwEntries.length === 0) return;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const empfaenger = getAenderungenMeldenEmpfaenger(ss);
+
+  // Betroffene Spieler aus dem Saison-Diff ermitteln
+  const affectedNames = new Set<string>();
+  if (saisonDiffs) {
+    for (const mod of saisonDiffs.modified) {
+      for (const c of mod.changedCells) {
+        if (SHEET_CONFIG.spieler.some(s => s.name === c.label)) affectedNames.add(c.label);
+      }
+    }
+    for (const a of saisonDiffs.added) {
+      for (let pi = 0; pi < a.playerAssignments.length; pi++) {
+        if (a.playerAssignments[pi] && !a.playerAssignments[pi].startsWith('✗')) {
+          affectedNames.add(SHEET_CONFIG.spieler[pi].name);
+        }
+      }
+      for (const n of a.ersatz) { if (n) affectedNames.add(n); }
+    }
+    for (const d of saisonDiffs.deleted) {
+      for (let pi = 0; pi < d.playerAssignments.length; pi++) {
+        if (d.playerAssignments[pi] && !d.playerAssignments[pi].startsWith('✗')) {
+          affectedNames.add(SHEET_CONFIG.spieler[pi].name);
+        }
+      }
+      for (const n of d.ersatz) { if (n) affectedNames.add(n); }
+    }
+  }
+
+  const empfaenger = getAenderungenMeldenEmpfaenger(ss, affectedNames);
   if (empfaenger.length === 0) return;
 
   const subject = `Einsatzplaner – Änderungen vom ${Utilities.formatDate(new Date(), 'Europe/Berlin', 'dd.MM.yyyy HH:mm')}`;
@@ -1094,12 +1121,16 @@ function escapeHtml(s: string): string {
  *
  * Immer dabei:
  *   - Kapitän (Rolle "Kapitän" und gültige E-Mail)
+ *   - Spieler, deren eigener Einsatz geändert wurde (unabhängig von Checkbox)
  *
  * Optional (wenn Checkbox gesetzt):
  *   - Alle Spieler mit "Aufstellungsänderungen melden" = TRUE
  *   - Ausnahme: der aktuelle Bearbeiter selbst wird nicht benachrichtigt
  */
-function getAenderungenMeldenEmpfaenger(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string[] {
+function getAenderungenMeldenEmpfaenger(
+  ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
+  affectedNames: Set<string>
+): string[] {
   const spielerSheet = ss.getSheetByName(SHEET_NAMES.SPIELER);
   if (!spielerSheet) return [];
 
@@ -1117,9 +1148,10 @@ function getAenderungenMeldenEmpfaenger(ss: GoogleAppsScript.Spreadsheet.Spreads
     const rolle = String(row[COL_SPIELER.Rolle - 1] || '').trim();
     const melden = row[COL_SPIELER.AenderungenMelden - 1] === true
       || row[COL_SPIELER.AenderungenMelden - 1] === 'TRUE';
+    const name = String(row[COL_SPIELER.Name - 1] || '').trim();
 
-    // Kapitän immer, andere nur mit Checkbox
-    if (rolle === 'Kapitän' || melden) {
+    // Kapitän immer, betroffene Spieler immer, andere nur mit Checkbox
+    if (rolle === 'Kapitän' || affectedNames.has(name) || melden) {
       if (!empfaenger.includes(email)) empfaenger.push(email);
     }
   }
