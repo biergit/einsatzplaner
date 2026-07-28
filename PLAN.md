@@ -142,3 +142,4 @@ enum COL_AENDERUNGSLOG { Zeitstempel = 1, Bereich = 2, AlterWert = 3, NeuerWert 
 - [ ] Daten-Import aus bestehendem Sheet
 - [ ] Delta-Erkennung bei Aufstellungs-Änderungen (nur geänderte Spieler benachrichtigen)
 - [ ] Saison-bezogene Auswertungen
+- [ ] Fehlerlog-Blatt (500 Zeilen, Time-basiertes Trimming) für unbehandelte Exceptions in Mail-Versand, Timer, PropertyService
