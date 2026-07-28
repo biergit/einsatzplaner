@@ -38,7 +38,6 @@ interface SaisonRowSnapshot {
   startzeit: string;
   heimAuswaerts: string;
   playerAssignments: string[];
-  playerNames: string[];
   ersatz: string[];
   status: string;
   hinweis: string;
@@ -418,9 +417,7 @@ function readSaisonSnapshot(sheet: GoogleAppsScript.Spreadsheet.Sheet | null): S
       ? Utilities.formatDate(datumVal, 'Europe/Berlin', 'dd.MM.yyyy') : '';
 
     const assignments: string[] = [];
-    const names: string[] = [];
     for (let pi = 0; pi < numPlayers; pi++) {
-      names.push(SHEET_CONFIG.spieler[pi].name);
       assignments.push(String(data[r][saisonSpielerCol(pi) - 1] || '').trim());
     }
 
@@ -435,7 +432,6 @@ function readSaisonSnapshot(sheet: GoogleAppsScript.Spreadsheet.Sheet | null): S
       startzeit: formatStartzeit(data[r][saisonStartzeitCol() - 1]),
       heimAuswaerts: String(data[r][saisonHeimAuswaertsCol() - 1] || '').trim(),
       playerAssignments: assignments,
-      playerNames: names,
       ersatz,
       status: String(data[r][saisonStatusCol() - 1] || '').trim(),
       hinweis: String(data[r][saisonHinweisCol() - 1] || '').trim(),
@@ -479,7 +475,11 @@ function onDebounceTimer(): void {
   for (const t of ScriptApp.getProjectTriggers()) {
     if (t.getHandlerFunction() === 'onDebounceTimer') ScriptApp.deleteTrigger(t);
   }
-  flushPendingChanges();
+  try {
+    flushPendingChanges();
+  } catch (e) {
+    Logger.log(`onDebounceTimer error: ${e}`);
+  }
 }
 
 // ─── Pending-Puffer verarbeiten und Log schreiben ──────────────────────────
@@ -765,10 +765,10 @@ function diffSaisonRow(oldR: SaisonRowSnapshot, newR: SaisonRowSnapshot): Change
   if (oldR.startzeit !== newR.startzeit) changes.push({ label: 'Startzeit', oldVal: oldR.startzeit, newVal: newR.startzeit });
   if (oldR.heimAuswaerts !== newR.heimAuswaerts) changes.push({ label: 'Ort', oldVal: oldR.heimAuswaerts, newVal: newR.heimAuswaerts });
 
-  for (let pi = 0; pi < oldR.playerNames.length; pi++) {
+  for (let pi = 0; pi < SHEET_CONFIG.spieler.length; pi++) {
     const ov = oldR.playerAssignments[pi];
     const nv = newR.playerAssignments[pi];
-    if (ov !== nv) changes.push({ label: oldR.playerNames[pi], oldVal: ov, newVal: nv });
+    if (ov !== nv) changes.push({ label: SHEET_CONFIG.spieler[pi].name, oldVal: ov, newVal: nv });
   }
 
   for (let ei = 0; ei < 3; ei++) {
@@ -998,9 +998,9 @@ function buildColumnListFromRow(row: SaisonRowSnapshot): { label: string; oldVal
   if (row.gegner) cols.push({ label: 'Gegner', oldVal: '', newVal: row.gegner });
   if (row.startzeit) cols.push({ label: 'Startzeit', oldVal: '', newVal: row.startzeit });
   if (row.heimAuswaerts) cols.push({ label: 'Ort', oldVal: '', newVal: row.heimAuswaerts });
-  for (let pi = 0; pi < row.playerNames.length; pi++) {
+  for (let pi = 0; pi < row.playerAssignments.length; pi++) {
     const v = row.playerAssignments[pi];
-    if (v && !v.startsWith('✗')) cols.push({ label: row.playerNames[pi], oldVal: '', newVal: v });
+    if (v && !v.startsWith('✗')) cols.push({ label: SHEET_CONFIG.spieler[pi].name, oldVal: '', newVal: v });
   }
   for (let ei = 0; ei < 3; ei++) {
     const v = row.ersatz[ei];
@@ -1017,11 +1017,12 @@ function buildFullColumnList(oldR: SaisonRowSnapshot, newR: SaisonRowSnapshot, c
   cols.push({ label: 'Gegner', oldVal: oldR.gegner, newVal: newR.gegner });
   if (oldR.startzeit || newR.startzeit) cols.push({ label: 'Startzeit', oldVal: oldR.startzeit, newVal: newR.startzeit });
   cols.push({ label: 'Ort', oldVal: oldR.heimAuswaerts, newVal: newR.heimAuswaerts });
-  for (let pi = 0; pi < oldR.playerNames.length; pi++) {
+  for (let pi = 0; pi < SHEET_CONFIG.spieler.length; pi++) {
     const ov = oldR.playerAssignments[pi];
     const nv = newR.playerAssignments[pi];
-    if (ov && !ov.startsWith('✗') || nv && !nv.startsWith('✗') || changedSet.has(oldR.playerNames[pi])) {
-      cols.push({ label: oldR.playerNames[pi], oldVal: ov, newVal: nv });
+    const name = SHEET_CONFIG.spieler[pi].name;
+    if (ov && !ov.startsWith('✗') || nv && !nv.startsWith('✗') || changedSet.has(name)) {
+      cols.push({ label: name, oldVal: ov, newVal: nv });
     }
   }
   for (let ei = 0; ei < 3; ei++) {
