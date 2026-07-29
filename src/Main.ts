@@ -46,7 +46,7 @@ function menuDatenExportieren(): void {
     exportAllData();
     ui.alert(
       'Export erfolgreich',
-      'Die Rohdaten wurden als E-Mail-Anhang verschickt.',
+      'Die Rohdaten wurden als E-Mail verschickt. Die Tabellen können per Copy & Paste direkt in Google Sheets oder eine .tsv-Datei eingefügt werden.',
       ui.ButtonSet.OK
     );
   } catch (e) {
