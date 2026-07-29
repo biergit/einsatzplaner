@@ -643,7 +643,7 @@ function flushPendingChanges(): void {
         sheetName: SHEET_NAMES.SAISON,
         rangeA1: n.datum,
         alterWert: '(neuer Spieltag)',
-        neuerWert: n.gegner,
+        neuerWert: formatSaisonRowForLog(n),
         bearbeiter,
       });
     }
@@ -652,7 +652,7 @@ function flushPendingChanges(): void {
         timestamp: Date.now(),
         sheetName: SHEET_NAMES.SAISON,
         rangeA1: d.datum,
-        alterWert: d.gegner,
+        alterWert: formatSaisonRowForLog(d),
         neuerWert: '(gelöscht)',
         bearbeiter,
       });
