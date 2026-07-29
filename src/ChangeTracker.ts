@@ -1110,16 +1110,27 @@ function buildOhneEmailSektion(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, sai
     const p = d.split('.');
     return p.length === 3 ? p[2] + p[1] + p[0] : d;
   };
-  rows.sort((a, b) => sortKey(a.spieltag.split(' — ')[0]).localeCompare(sortKey(b.spieltag.split(' — ')[0])));
+
+  const grouped: Record<string, OhneEmailRow[]> = {};
+  for (const r of rows) {
+    if (!grouped[r.spieler]) grouped[r.spieler] = [];
+    grouped[r.spieler].push(r);
+  }
+  for (const name of Object.keys(grouped)) {
+    grouped[name].sort((a, b) => sortKey(a.spieltag.split(' — ')[0]).localeCompare(sortKey(b.spieltag.split(' — ')[0])));
+  }
 
   const s = emailStyles();
   let html = '<p style="margin-top:20px"><b>Ohne E-Mail-Adresse:</b><br>Folgende Spieler konnten nicht per E-Mail informiert werden:</p>';
-  html += '<table border="1" cellpadding="4" cellspacing="0" style="font-size:13px;border-collapse:collapse">';
-  html += '<tr style="background:#4A90D9;color:white"><th>Spieltag</th><th>Spieler</th><th>Einsatz</th></tr>';
-  for (const r of rows) {
-    html += `<tr><td style="padding:2px 6px">${escapeHtml(r.spieltag)}</td><td style="padding:2px 6px">${escapeHtml(r.spieler)}</td><td style="padding:2px 6px">${escapeHtml(r.einsatz)}</td></tr>`;
+  for (const name of Object.keys(grouped).sort()) {
+    html += `<p style="margin-bottom:2px;font-weight:bold">${escapeHtml(name)}</p>`;
+    html += '<table border="1" cellpadding="4" cellspacing="0" style="font-size:13px;border-collapse:collapse;margin-bottom:12px">';
+    html += '<tr style="background:#4A90D9;color:white"><th>Spieltag</th><th>Einsatz</th></tr>';
+    for (const r of grouped[name]) {
+      html += `<tr><td style="padding:2px 6px">${escapeHtml(r.spieltag)}</td><td style="padding:2px 6px">${escapeHtml(r.einsatz)}</td></tr>`;
+    }
+    html += '</table>';
   }
-  html += '</table>';
 
   return html;
 }

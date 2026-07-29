@@ -156,24 +156,24 @@ function buildOhneEmailTabelle(ohneEmail: { name: string; einsaetze: EinsatzInfo
     return p.length === 3 ? p[2] + p[1] + p[0] : d;
   };
 
-  const allRows: { datum: string; gegner: string; name: string; einsatzart: string }[] = [];
+  let html = '<p style="margin-top:20px"><b>Ohne E-Mail-Adresse:</b><br>Folgende Spieler konnten nicht per E-Mail informiert werden:</p>';
+
   for (const { name, einsaetze } of ohneEmail) {
-    for (const e of einsaetze) {
-      allRows.push({ datum: e.datum, gegner: e.gegner, name, einsatzart: e.einsatzart });
+    const sorted = [...einsaetze].sort((a, b) => sortKey(a.datum).localeCompare(sortKey(b.datum)));
+
+    let rows = '';
+    for (const e of sorted) {
+      rows += `<tr><td style="padding:2px 6px">${escapeHtml(e.datum)} — ${escapeHtml(e.gegner)}</td><td style="padding:2px 6px">${escapeHtml(e.einsatzart)}</td></tr>`;
     }
-  }
-  allRows.sort((a, b) => sortKey(a.datum).localeCompare(sortKey(b.datum)));
 
-  let rows = '';
-  for (const r of allRows) {
-    rows += `<tr><td style="padding:2px 6px">${escapeHtml(r.datum)} — ${escapeHtml(r.gegner)}</td><td style="padding:2px 6px">${escapeHtml(r.name)}</td><td style="padding:2px 6px">${escapeHtml(r.einsatzart)}</td></tr>`;
-  }
-
-  return `<p style="margin-top:20px"><b>Ohne E-Mail-Adresse:</b><br>Folgende Spieler konnten nicht per E-Mail informiert werden:</p>
-<table border="1" cellpadding="4" cellspacing="0" style="font-size:13px;border-collapse:collapse">
-<tr style="background:#4A90D9;color:white"><th>Spieltag</th><th>Spieler</th><th>Einsatz</th></tr>
+    html += `<p style="margin-bottom:2px;font-weight:bold">${escapeHtml(name)}</p>
+<table border="1" cellpadding="4" cellspacing="0" style="font-size:13px;border-collapse:collapse;margin-bottom:12px">
+<tr style="background:#4A90D9;color:white"><th>Spieltag</th><th>Einsatz</th></tr>
 ${rows}
 </table>`;
+  }
+
+  return html;
 }
 
 function buildHtmlTable(rows: string[][]): string {
