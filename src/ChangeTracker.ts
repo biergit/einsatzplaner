@@ -1035,77 +1035,87 @@ function logChange(entry: ChangeEntry): void {
 /**
  * Baut die Ohne-Email-Sektion für den Kapitän.
  *
- * Iteriert über saisonDiffs und sammelt alle Spieler ohne hinterlegte
- * E-Mail-Adresse, deren Aufstellung sich geändert hat. Die Tabelle zeigt
- * Datum/Gegner, Spielername und die neue Einsatzart (bzw. „-" wenn der
- * Spieler nicht mehr aufgestellt ist).
+ * Anhand von affectedNames wird ermittelt, welche betroffenen Spieler
+ * keine hinterlegte E-Mail-Adresse haben. Aus dem aktuellen Saison-Sheet
+ * werden deren Aufstellungen (Final oder Geplant) gelesen und als gruppierte
+ * Tabellen (pro Spieler, sortiert nach Datum) aufbereitet.
  *
- * Ist als eigenständige Funktion ohne Abhängigkeit zum Mail-Versand
- * implementiert, um später problemlos auf eine separate Mail umstellbar zu sein.
- *
- * Gibt einen leeren String zurück, wenn keine Ohne-Email-Änderungen vorliegen.
+ * Ist unabhängig von Saison-Diffs — funktioniert auch beim ersten Edit.
+ * Gibt einen leeren String zurück, wenn nichts anzuzeigen ist.
  */
-function buildOhneEmailSektion(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, saisonDiffs: SaisonDiffResult): string {
-  const ohneEmailNamen = new Set<string>();
-  const spielerSheet = ss.getSheetByName(SHEET_NAMES.SPIELER);
-  if (spielerSheet) {
-    const lr = spielerSheet.getLastRow();
-    const d = spielerSheet.getRange(2, 1, lr - 1, COL_SPIELER.Rolle).getValues();
-    for (const r of d) {
-      const name = String(r[COL_SPIELER.Name - 1] || '').trim();
-      if (!name) continue;
-      const email = String(r[COL_SPIELER.Email - 1]).trim();
-      if (!email || !email.includes('@')) ohneEmailNamen.add(name);
-    }
-  }
+function buildOhneEmailSektion(
+  ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
+  affectedNames: Set<string>
+): string {
+  if (affectedNames.size === 0) return '';
+
+  const ohneEmailNamen = collectOhneEmailNamen(ss, affectedNames);
   if (ohneEmailNamen.size === 0) return '';
 
-  interface OhneEmailRow {
-    spieltag: string;
-    spieler: string;
-    einsatz: string;
-  }
-  const rows: OhneEmailRow[] = [];
-  const spieltagKey = (r: SaisonRowSnapshot) => `${r.datum} — ${r.gegner}`;
-
-  const addRow = (r: SaisonRowSnapshot, name: string, einsatz: string) => {
-    if (ohneEmailNamen.has(name)) {
-      rows.push({ spieltag: spieltagKey(r), spieler: name, einsatz });
-    }
-  };
-
-  for (const mod of saisonDiffs.modified) {
-    for (let pi = 0; pi < SHEET_CONFIG.spieler.length; pi++) {
-      const ov = mod.oldRow.playerAssignments[pi];
-      const nv = mod.newRow.playerAssignments[pi];
-      if (ov === nv) continue;
-      const name = SHEET_CONFIG.spieler[pi].name;
-      if (nv && !nv.startsWith('✗')) {
-        addRow(mod.newRow, name, nv);
-      } else {
-        addRow(mod.oldRow, name, '-');
-      }
-    }
-  }
-  for (const a of saisonDiffs.added) {
-    for (let pi = 0; pi < SHEET_CONFIG.spieler.length; pi++) {
-      const nv = a.playerAssignments[pi];
-      if (nv && !nv.startsWith('✗')) {
-        addRow(a, SHEET_CONFIG.spieler[pi].name, nv);
-      }
-    }
-  }
-  for (const d of saisonDiffs.deleted) {
-    for (let pi = 0; pi < SHEET_CONFIG.spieler.length; pi++) {
-      const ov = d.playerAssignments[pi];
-      if (ov && !ov.startsWith('✗')) {
-        addRow(d, SHEET_CONFIG.spieler[pi].name, '-');
-      }
-    }
-  }
-
+  const saisonSheet = ss.getSheetByName(SHEET_NAMES.SAISON);
+  const saisonRows = readSaisonSnapshot(saisonSheet);
+  const rows = collectOhneEmailRows(saisonRows, ohneEmailNamen, SHEET_CONFIG.spieler.map(s => s.name));
   if (rows.length === 0) return '';
 
+  return buildOhneEmailHtml(rows);
+}
+
+/** Liest aus dem Spieler-Sheet: welche der affectedNames haben keine gültige E-Mail. */
+function collectOhneEmailNamen(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, affectedNames: Set<string>): Set<string> {
+  const result = new Set<string>();
+  const spielerSheet = ss.getSheetByName(SHEET_NAMES.SPIELER);
+  if (!spielerSheet) return result;
+  const lr = spielerSheet.getLastRow();
+  if (lr <= 1) return result;
+  const data = spielerSheet.getRange(2, 1, lr - 1, COL_SPIELER.Rolle).getValues();
+  for (const r of data) {
+    const name = String(r[COL_SPIELER.Name - 1] || '').trim();
+    if (!name || !affectedNames.has(name)) continue;
+    const email = String(r[COL_SPIELER.Email - 1]).trim();
+    if (!email || !email.includes('@')) result.add(name);
+  }
+  return result;
+}
+
+interface OhneEmailRow {
+  spieltag: string;
+  spieler: string;
+  einsatz: string;
+}
+
+/**
+ * Sammelt aus den Saison-Zeilen alle Aufstellungen für die gegebenen
+ * Ohne-Email-Spieler. Nur Zeilen mit Status Final oder Geplant werden
+ * berücksichtigt.
+ *
+ * Rein funktional (kein GAS-Zugriff), dadurch testbar.
+ */
+function collectOhneEmailRows(
+  saisonRows: SaisonRowSnapshot[],
+  ohneEmailNamen: Set<string>,
+  playerNames: string[]
+): OhneEmailRow[] {
+  const rows: OhneEmailRow[] = [];
+  for (const r of saisonRows) {
+    if (r.status !== 'Final' && r.status !== 'Geplant') continue;
+    const spieltag = `${r.datum} — ${r.gegner}`;
+    for (let pi = 0; pi < playerNames.length; pi++) {
+      const name = playerNames[pi];
+      if (!ohneEmailNamen.has(name)) continue;
+      const einsatz = r.playerAssignments[pi];
+      if (einsatz && !einsatz.startsWith('✗')) {
+        rows.push({ spieltag, spieler: name, einsatz });
+      }
+    }
+    for (const eName of r.ersatz) {
+      if (!eName || !ohneEmailNamen.has(eName)) continue;
+      rows.push({ spieltag, spieler: eName, einsatz: 'Ersatz' });
+    }
+  }
+  return rows;
+}
+
+function buildOhneEmailHtml(rows: OhneEmailRow[]): string {
   const sortKey = (d: string) => {
     const p = d.split('.');
     return p.length === 3 ? p[2] + p[1] + p[0] : d;
@@ -1120,18 +1130,16 @@ function buildOhneEmailSektion(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, sai
     grouped[name].sort((a, b) => sortKey(a.spieltag.split(' — ')[0]).localeCompare(sortKey(b.spieltag.split(' — ')[0])));
   }
 
-  const s = emailStyles();
   let html = '<p style="margin-top:20px"><b>Ohne E-Mail-Adresse:</b><br>Folgende Spieler konnten nicht per E-Mail informiert werden:</p>';
   for (const name of Object.keys(grouped).sort()) {
-    html += `<p style="margin-bottom:2px;font-weight:bold">${escapeHtml(name)}</p>`;
-    html += '<table border="1" cellpadding="4" cellspacing="0" style="font-size:13px;border-collapse:collapse;margin-bottom:12px">';
-    html += '<tr style="background:#4A90D9;color:white"><th>Spieltag</th><th>Einsatz</th></tr>';
+    html += `<p style="margin-bottom:2px;font-weight:bold">${escapeHtml(name)}</p>
+<table border="1" cellpadding="4" cellspacing="0" style="font-size:13px;border-collapse:collapse;margin-bottom:12px">
+<tr style="background:#4A90D9;color:white"><th>Spieltag</th><th>Einsatz</th></tr>`;
     for (const r of grouped[name]) {
       html += `<tr><td style="padding:2px 6px">${escapeHtml(r.spieltag)}</td><td style="padding:2px 6px">${escapeHtml(r.einsatz)}</td></tr>`;
     }
     html += '</table>';
   }
-
   return html;
 }
 
@@ -1164,8 +1172,9 @@ function sendChangeNotification(
   const suppress = props.getProperty('SUPPRESS_NOTIFICATION') === 'true';
 
   // SUPPRESS_NOTIFICATION: Nach "Finalisieren + Senden" keine redundante
-  // Änderungsmail. Ohne-Email-Info wird bereits synchron in
-  // menuFinalisierenUndSenden per sendOhneEmailFinalMail versendet.
+  // Änderungsmail. Wird in menuFinalisierenUndSenden gesetzt und dort auch
+  // nach Abschluss wieder gelöscht. Falls das Flag dennoch liegt (z.B. Crash
+  // während Finalisierung), wird es hier als Fallback konsumiert.
   if (suppress) {
     Logger.log('sendChangeNotification: SUPPRESS_NOTIFICATION → unterdrückt');
     props.deleteProperty('SUPPRESS_NOTIFICATION');
@@ -1300,7 +1309,7 @@ function sendChangeNotification(
 
   // ── Ohne-Email-Sektion (nur für den Kapitän) ──
   const kapEmail = getKapitaenEmail(ss);
-  const ohneHtml = saisonDiffs ? buildOhneEmailSektion(ss, saisonDiffs) : '';
+  const ohneHtml = buildOhneEmailSektion(ss, affectedNames);
 
   const footerHtml = `<p style="${s.footer}">Viele Grüße,<br>Dein Einsatzplaner-Team</p></body></html>`;
 

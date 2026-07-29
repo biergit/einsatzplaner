@@ -375,6 +375,7 @@ interface AbwAffectedEntry {
   spielerName: string;
   warAufgestellt: boolean;
   warFinal: boolean;
+  validierung: string;
 }
 
 function ae(overrides: Partial<AbwAffectedEntry> = {}): AbwAffectedEntry {
@@ -386,6 +387,7 @@ function ae(overrides: Partial<AbwAffectedEntry> = {}): AbwAffectedEntry {
     spielerName: 'Max',
     warAufgestellt: false,
     warFinal: false,
+    validierung: '',
     ...overrides,
   };
 }
@@ -865,5 +867,205 @@ describe('AbwAffectedEntry status message', () => {
   it('nicht aufgestellt → Ersatz-Hinweis', () => {
     expect(statusText(false, false, ''))
       .toBe('Stand als Ersatz zur Verfügung');
+  });
+});
+
+// ─── Ohne-Email-Zeilen-Sammlung (collectOhneEmailRows) ──────────────────────
+
+interface OhneEmailRow {
+  spieltag: string;
+  spieler: string;
+  einsatz: string;
+}
+
+function collectOhneEmailRows(
+  saisonRows: SaisonRowSnapshot[],
+  ohneEmailNamen: Set<string>,
+  playerNames: string[]
+): OhneEmailRow[] {
+  const rows: OhneEmailRow[] = [];
+  for (const r of saisonRows) {
+    if (r.status !== 'Final' && r.status !== 'Geplant') continue;
+    const spieltag = `${r.datum} — ${r.gegner}`;
+    for (let pi = 0; pi < playerNames.length; pi++) {
+      const name = playerNames[pi];
+      if (!ohneEmailNamen.has(name)) continue;
+      const einsatz = r.playerAssignments[pi];
+      if (einsatz && !einsatz.startsWith('✗')) {
+        rows.push({ spieltag, spieler: name, einsatz });
+      }
+    }
+    for (const eName of r.ersatz) {
+      if (!eName || !ohneEmailNamen.has(eName)) continue;
+      rows.push({ spieltag, spieler: eName, einsatz: 'Ersatz' });
+    }
+  }
+  return rows;
+}
+
+const testPlayers = ['Max', 'Anna', 'Tom'];
+
+describe('collectOhneEmailRows', () => {
+  it('empty saisonRows → empty result', () => {
+    const rows = collectOhneEmailRows([], new Set(['Max']), testPlayers);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('empty ohneEmailNamen → empty result', () => {
+    const saisonRows = [sRow('01.09.2026', 'ABC')];
+    const rows = collectOhneEmailRows(saisonRows, new Set(), testPlayers);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('non-Final/Geplant status → ignored', () => {
+    const saisonRows = [sRow('01.09.2026', 'ABC', { status: 'Pausiert' })];
+    const rows = collectOhneEmailRows(saisonRows, new Set(['Max']), testPlayers);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('player in ohneEmailNamen with Final status → included', () => {
+    const saisonRows = [sRow('01.09.2026', 'ABC', {
+      status: 'Final',
+      playerAssignments: ['Einzel+Doppel', '', ''],
+    })];
+    const rows = collectOhneEmailRows(saisonRows, new Set(['Max']), testPlayers);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual({
+      spieltag: '01.09.2026 — ABC',
+      spieler: 'Max',
+      einsatz: 'Einzel+Doppel',
+    });
+  });
+
+  it('player not in ohneEmailNamen → excluded', () => {
+    const saisonRows = [sRow('01.09.2026', 'ABC', {
+      playerAssignments: ['Einzel+Doppel', 'Einzel', ''],
+    })];
+    const rows = collectOhneEmailRows(saisonRows, new Set(['Tom']), testPlayers);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('✗ prefix → excluded', () => {
+    const saisonRows = [sRow('01.09.2026', 'ABC', {
+      playerAssignments: ['✗ Urlaub', '', ''],
+    })];
+    const rows = collectOhneEmailRows(saisonRows, new Set(['Max']), testPlayers);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('empty einsatz → excluded', () => {
+    const saisonRows = [sRow('01.09.2026', 'ABC', {
+      playerAssignments: ['', '', ''],
+    })];
+    const rows = collectOhneEmailRows(saisonRows, new Set(['Max']), testPlayers);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('Ersatz in ohneEmailNamen → included', () => {
+    const saisonRows = [sRow('01.09.2026', 'ABC', {
+      status: 'Final',
+      playerAssignments: ['', '', ''],
+      ersatz: ['Gast1', '', ''],
+    })];
+    const rows = collectOhneEmailRows(saisonRows, new Set(['Gast1']), testPlayers);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual({
+      spieltag: '01.09.2026 — ABC',
+      spieler: 'Gast1',
+      einsatz: 'Ersatz',
+    });
+  });
+
+  it('Ersatz empty or not in set → excluded', () => {
+    const saisonRows = [sRow('01.09.2026', 'ABC', {
+      ersatz: ['', '', ''],
+    })];
+    const rows = collectOhneEmailRows(saisonRows, new Set(['Gast1']), testPlayers);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('multiple players and match days → collected independently', () => {
+    const saisonRows = [
+      sRow('01.09.2026', 'ABC', {
+        status: 'Final',
+        playerAssignments: ['Einzel+Doppel', 'Doppel', 'Einzel'],
+      }),
+      sRow('15.09.2026', 'DEF', {
+        status: 'Geplant',
+        playerAssignments: ['Einzel', '', 'Doppel'],
+        ersatz: ['Max', '', ''],
+      }),
+    ];
+    const rows = collectOhneEmailRows(saisonRows, new Set(['Max', 'Anna', 'Tom']), testPlayers);
+    expect(rows).toHaveLength(6);
+    expect(rows.map(r => r.einsatz)).toContain('Einzel+Doppel');
+    expect(rows.map(r => r.einsatz)).toContain('Einzel');
+    expect(rows.map(r => r.einsatz)).toContain('Ersatz');
+  });
+});
+
+// ─── buildOhneEmailHtml: Gruppierung & Sortierung ───────────────────────────
+
+function buildOhneEmailHtml(rows: OhneEmailRow[]): string {
+  const sortKey = (d: string) => {
+    const p = d.split('.');
+    return p.length === 3 ? p[2] + p[1] + p[0] : d;
+  };
+
+  const grouped: Record<string, OhneEmailRow[]> = {};
+  for (const r of rows) {
+    if (!grouped[r.spieler]) grouped[r.spieler] = [];
+    grouped[r.spieler].push(r);
+  }
+  for (const name of Object.keys(grouped)) {
+    grouped[name].sort((a, b) => sortKey(a.spieltag.split(' — ')[0]).localeCompare(sortKey(b.spieltag.split(' — ')[0])));
+  }
+
+  let html = '<p>Ohne E-Mail-Adresse:</p>';
+  for (const name of Object.keys(grouped).sort()) {
+    html += `<p>${name}</p><table>`;
+    for (const r of grouped[name]) {
+      html += `<tr><td>${r.spieltag}</td><td>${r.einsatz}</td></tr>`;
+    }
+    html += '</table>';
+  }
+  return html;
+}
+
+describe('buildOhneEmailHtml grouping & sorting', () => {
+  it('empty rows → header only', () => {
+    const html = buildOhneEmailHtml([]);
+    expect(html).toBe('<p>Ohne E-Mail-Adresse:</p>');
+  });
+
+  it('single player → one table', () => {
+    const rows: OhneEmailRow[] = [
+      { spieltag: '01.09.2026 — ABC', spieler: 'Max', einsatz: 'Einzel+Doppel' },
+    ];
+    const html = buildOhneEmailHtml(rows);
+    expect(html).toContain('<p>Max</p>');
+    expect(html).toContain('Einzel+Doppel');
+  });
+
+  it('multiple players → separate tables alphabetically sorted', () => {
+    const rows: OhneEmailRow[] = [
+      { spieltag: '01.09.2026 — ABC', spieler: 'Tom', einsatz: 'Doppel' },
+      { spieltag: '01.09.2026 — ABC', spieler: 'Anna', einsatz: 'Einzel' },
+    ];
+    const html = buildOhneEmailHtml(rows);
+    const annaIdx = html.indexOf('<p>Anna</p>');
+    const tomIdx = html.indexOf('<p>Tom</p>');
+    expect(annaIdx).toBeLessThan(tomIdx);
+  });
+
+  it('same player → sorted by date ascending', () => {
+    const rows: OhneEmailRow[] = [
+      { spieltag: '15.09.2026 — DEF', spieler: 'Max', einsatz: 'Doppel' },
+      { spieltag: '01.09.2026 — ABC', spieler: 'Max', einsatz: 'Einzel+Doppel' },
+    ];
+    const html = buildOhneEmailHtml(rows);
+    const abcIdx = html.indexOf('ABC');
+    const defIdx = html.indexOf('DEF');
+    expect(abcIdx).toBeLessThan(defIdx);
   });
 });

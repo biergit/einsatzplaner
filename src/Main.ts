@@ -12,6 +12,8 @@ function onOpen(): void {
     .addSubMenu(ui.createMenu('Danger Zone')
       .addItem('Sheet neu aufbauen', 'menuSheetNeuAufbauen'))
     .addToUi();
+
+  saveSheetSnapshots(SpreadsheetApp.getActiveSpreadsheet());
 }
 
 function menuSheetNeuAufbauen(): void {
@@ -27,7 +29,9 @@ function menuSheetNeuAufbauen(): void {
   try {
     const props = PropertiesService.getScriptProperties();
     props.setProperty('SHEET_BUILDER_RUNNING', 'true');
+    props.deleteProperty('SUPPRESS_NOTIFICATION');
     buildAllSheets(SHEET_CONFIG);
+    saveSheetSnapshots(SpreadsheetApp.getActiveSpreadsheet());
     props.setProperty('SHEET_BUILDER_RUNNING', 'false');
     ui.alert('Fertig', 'Das Sheet wurde erfolgreich neu aufgebaut.', ui.ButtonSet.OK);
   } catch (e) {
@@ -94,6 +98,7 @@ function menuFinalisierenUndSenden(): void {
   }
 
   PropertiesService.getScriptProperties().deleteProperty('BULK_EDIT');
+  PropertiesService.getScriptProperties().deleteProperty('SUPPRESS_NOTIFICATION');
   resetDebounceTimer();
 
   try {
