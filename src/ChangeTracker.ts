@@ -1243,7 +1243,7 @@ function sendChangeNotification(
 
   const subject = `Einsatzplaner – Änderungen vom ${Utilities.formatDate(new Date(), 'Europe/Berlin', 'dd.MM.yyyy HH:mm')}`;
   const s = emailStyles();
-  let html = `<html><body style="${s.body}">
+  let html = emailHeader() + `
 <p>Hallo,</p>`;
 
   if (visibleSaisonCount > 0 && saisonDiffs) {
@@ -1311,13 +1311,13 @@ function sendChangeNotification(
   const kapEmail = getKapitaenEmail(ss);
   const ohneHtml = buildOhneEmailSektion(ss, affectedNames);
 
-  const footerHtml = `<p style="${s.footer}">Viele Grüße,<br>Dein Einsatzplaner-Team</p></body></html>`;
+  const footer = emailFooter();
 
   for (const email of empfaenger) {
     const isKapitaen = email === kapEmail;
     const body = isKapitaen && ohneHtml
-      ? html + ohneHtml + footerHtml
-      : html + footerHtml;
+      ? html + ohneHtml + footer
+      : html + footer;
     MailApp.sendEmail({ to: email, subject, htmlBody: body });
   }
   Logger.log(`sendChangeNotification: Mail an ${empfaenger.length} Empfänger (${empfaenger.join(', ')})` +

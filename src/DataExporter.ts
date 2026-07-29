@@ -15,7 +15,7 @@ function exportAllData(): void {
   const timestamp = Utilities.formatDate(new Date(), 'Europe/Berlin', 'dd.MM.yyyy HH:mm');
   const s = emailStyles();
 
-  let html = `<html><body style="${s.body}">`;
+  let html = emailHeader();
   html += `<p>Hallo,</p><p>hier der Datenexport vom ${timestamp}.</p>`;
 
   html += buildSpielerSection(ss, s);
@@ -25,7 +25,7 @@ function exportAllData(): void {
 
   html += `<p>Jede Sektion besteht aus einer HTML-Tabelle (für Copy & Paste nach Google Sheets) und einem
 TSV-Block (für Copy & Paste in eine .tsv-Datei). Einstellungen liegen als JSON vor.</p>`;
-  html += `<p style="${s.footer}">Viele Grüße,<br>Dein Einsatzplaner-Team</p></body></html>`;
+  html += emailFooter();
 
   MailApp.sendEmail({
     to: userEmail,

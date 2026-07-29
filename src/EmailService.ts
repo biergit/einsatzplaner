@@ -207,6 +207,17 @@ function emailStyles() {
   };
 }
 
+function emailHeader(): string {
+  return `<html><body style="${emailStyles().body}">`;
+}
+
+function emailFooter(): string {
+  const url = SpreadsheetApp.getActiveSpreadsheet().getUrl();
+  return `<p style="margin-top:16px;color:#888">Viele Grüße,<br>Dein Einsatzplaner-Team</p>
+<p style="font-size:12px;color:#999"><a href="${url}">Zum Google Sheet</a></p>
+</body></html>`;
+}
+
 function readSpielerNames(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string[] {
   const s = ss.getSheetByName(SHEET_NAMES.SPIELER);
   if (!s) return [];
@@ -252,7 +263,7 @@ function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], spielp
 
   const kmtHead = hasKommentar ? '<th>Kommentar</th>' : '';
 
-  const html = `<html><body style="font-family:Arial,sans-serif;font-size:14px">
+  const html = emailHeader() + `
 <p>Hallo ${spieler.name},</p>
 <p>hier ist dein persönlicher</p>
 <h1>EINSATZPLAN</h1>
@@ -264,8 +275,7 @@ ${personliche}
 <h1>GESAMTSPIELPLAN</h1>
 ${htmlTable}
 ${ohneHtml}
-<p>Viele Grüße,<br>Dein Einsatzplaner-Team</p>
-</body></html>`;
+${emailFooter()}`;
 
   MailApp.sendEmail({
     to: spieler.email,
