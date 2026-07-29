@@ -359,3 +359,511 @@ describe('computeSaisonDiff', () => {
     expect(result.added).toHaveLength(1);
   });
 });
+
+// ─── Benachrichtigungs-Logik (sendChangeNotification, flushPendingChanges) ──
+
+/**
+ * AbwAffectedEntry – wie in ChangeTracker.ts definiert.
+ * Wird von rebuildAbwesenheitenInSaison() befüllt und beim Mail-Versand
+ * ausgewertet.
+ */
+interface AbwAffectedEntry {
+  datumStr: string;
+  startzeit: string;
+  heimAuswaerts: string;
+  gegner: string;
+  spielerName: string;
+  warAufgestellt: boolean;
+  warFinal: boolean;
+}
+
+function ae(overrides: Partial<AbwAffectedEntry> = {}): AbwAffectedEntry {
+  return {
+    datumStr: '01.09.2026',
+    startzeit: '20:00',
+    heimAuswaerts: 'Heim',
+    gegner: 'Gegner ABC',
+    spielerName: 'Max',
+    warAufgestellt: false,
+    warFinal: false,
+    ...overrides,
+  };
+}
+
+describe('hasAffectedFinals detection', () => {
+  it('empty array → false', () => {
+    const result = [].some(a => a.warFinal);
+    expect(result).toBe(false);
+  });
+
+  it('single entry with warFinal=false → false', () => {
+    const result = [ae({ warFinal: false })].some(a => a.warFinal);
+    expect(result).toBe(false);
+  });
+
+  it('single entry with warFinal=true → true', () => {
+    const result = [ae({ warFinal: true })].some(a => a.warFinal);
+    expect(result).toBe(true);
+  });
+
+  it('multiple entries, none warFinal → false', () => {
+    const result = [
+      ae({ warFinal: false, spielerName: 'A' }),
+      ae({ warFinal: false, spielerName: 'B' }),
+      ae({ warFinal: false, spielerName: 'C' }),
+    ].some(a => a.warFinal);
+    expect(result).toBe(false);
+  });
+
+  it('multiple entries, one warFinal → true', () => {
+    const result = [
+      ae({ warFinal: false, spielerName: 'A' }),
+      ae({ warFinal: true, spielerName: 'B' }),   // Final→Geplant
+      ae({ warFinal: false, spielerName: 'C' }),
+    ].some(a => a.warFinal);
+    expect(result).toBe(true);
+  });
+
+  it('null input → false', () => {
+    const abwAffected: AbwAffectedEntry[] | null = null;
+    const result = abwAffected ? abwAffected.some(a => a.warFinal) : false;
+    expect(result).toBe(false);
+  });
+});
+
+describe('affectedNames from abwAffected', () => {
+  it('player with warAufgestellt=true is added', () => {
+    const affected: AbwAffectedEntry[] = [
+      ae({ spielerName: 'Max', warAufgestellt: true, warFinal: true }),
+    ];
+    const names = new Set<string>();
+    for (const a of affected) {
+      if (a.warAufgestellt) {
+        names.add(a.spielerName);
+      }
+    }
+    expect(names.has('Max')).toBe(true);
+  });
+
+  it('player with warAufgestellt=false is NOT added', () => {
+    const affected: AbwAffectedEntry[] = [
+      ae({ spielerName: 'ErsatzSpieler', warAufgestellt: false }),
+    ];
+    const names = new Set<string>();
+    for (const a of affected) {
+      if (a.warAufgestellt) {
+        names.add(a.spielerName);
+      }
+    }
+    expect(names.size).toBe(0);
+  });
+
+  it('multiple players: only warAufgestellt are added', () => {
+    const affected: AbwAffectedEntry[] = [
+      ae({ spielerName: 'Max', warAufgestellt: true }),
+      ae({ spielerName: 'Anna', warAufgestellt: false }),
+      ae({ spielerName: 'Tom', warAufgestellt: true }),
+    ];
+    const names = new Set<string>();
+    for (const a of affected) {
+      if (a.warAufgestellt) {
+        names.add(a.spielerName);
+      }
+    }
+    expect(names.has('Max')).toBe(true);
+    expect(names.has('Tom')).toBe(true);
+    expect(names.has('Anna')).toBe(false);
+    expect(names.size).toBe(2);
+  });
+
+  it('abwAffected is null → no names added', () => {
+    const affected: AbwAffectedEntry[] | null = null;
+    const names = new Set<string>();
+    if (affected) {
+      for (const a of affected) {
+        if (a.warAufgestellt) {
+          names.add(a.spielerName);
+        }
+      }
+    }
+    expect(names.size).toBe(0);
+  });
+});
+
+describe('sendChangeNotification guard logic', () => {
+  /**
+   * Entscheidungs-Logik aus sendChangeNotification (vereinfacht, ohne GAS-Abhängigkeiten):
+   * Die Mail wird unterdrückt, wenn ALLE drei Bedingungen zutreffen:
+   *   1. visibleSaisonCount === 0  (keine sichtbaren Saison-Änderungen)
+   *   2. abwEntries.length === 0   (keine Abwesenheits-Diff-Einträge)
+   *   3. !hasAffectedFinals        (kein Final→Geplant-Revert)
+   */
+  function shouldSuppressEmail(
+    visibleSaisonCount: number,
+    abwEntriesCount: number,
+    abwAffected: AbwAffectedEntry[] | null,
+  ): boolean {
+    const hasAffectedFinals = abwAffected ? abwAffected.some(a => a.warFinal) : false;
+    return visibleSaisonCount === 0 && abwEntriesCount === 0 && !hasAffectedFinals;
+  }
+
+  it('no saison changes, no abw entries, no affected finals → suppressed', () => {
+    expect(shouldSuppressEmail(0, 0, null)).toBe(true);
+  });
+
+  it('no saison changes, no abw entries, no final→Geplant → suppressed', () => {
+    expect(shouldSuppressEmail(0, 0, [ae({ warFinal: false })])).toBe(true);
+  });
+
+  it('no saison changes, no abw entries, BUT final→Geplant revert exists → NOT suppressed', () => {
+    expect(shouldSuppressEmail(0, 0, [ae({ warFinal: true })])).toBe(false);
+  });
+
+  it('no saison changes, BUT abw entries exist → NOT suppressed', () => {
+    expect(shouldSuppressEmail(0, 1, null)).toBe(false);
+  });
+
+  it('saison changes exist, no abw entries → NOT suppressed', () => {
+    expect(shouldSuppressEmail(1, 0, null)).toBe(false);
+  });
+
+  it('saison changes + abw entries + final→Geplant → NOT suppressed', () => {
+    expect(shouldSuppressEmail(1, 2, [ae({ warFinal: true })])).toBe(false);
+  });
+
+  it('only abw entries → NOT suppressed', () => {
+    expect(shouldSuppressEmail(0, 3, [ae({ warFinal: false })])).toBe(false);
+  });
+
+  it('multiple affected finals → NOT suppressed', () => {
+    expect(shouldSuppressEmail(0, 0, [
+      ae({ warFinal: true, spielerName: 'A' }),
+      ae({ warFinal: true, spielerName: 'B' }),
+    ])).toBe(false);
+  });
+});
+
+describe('Abw section display logic', () => {
+  /**
+   * Die Abwesenheits-Sektion im HTML wird angezeigt wenn:
+   *   showAbw && (abwEntriesCount > 0 || hasFinals)
+   * (showAbw ist true wenn abwAffected nicht-null und nicht-leer ist)
+   */
+  function shouldShowAbwSection(
+    abwAffected: AbwAffectedEntry[] | null,
+    abwEntriesCount: number,
+  ): boolean {
+    const showAbw = abwAffected && abwAffected.length > 0;
+    if (!showAbw) return false;
+    const hasFinals = abwAffected!.some(a => a.warFinal);
+    return abwEntriesCount > 0 || hasFinals;
+  }
+
+  it('abwAffected has entries with warFinal → shown even with 0 entries', () => {
+    expect(shouldShowAbwSection([ae({ warFinal: true })], 0)).toBe(true);
+  });
+
+  it('abwAffected has entries without warFinal, 0 entries → NOT shown', () => {
+    expect(shouldShowAbwSection([ae({ warFinal: false })], 0)).toBe(false);
+  });
+
+  it('abwAffected has entries without warFinal, entries=1 → shown', () => {
+    expect(shouldShowAbwSection([ae({ warFinal: false })], 1)).toBe(true);
+  });
+
+  it('abwAffected null → NOT shown', () => {
+    expect(shouldShowAbwSection(null, 5)).toBe(false);
+  });
+
+  it('abwAffected empty → NOT shown', () => {
+    expect(shouldShowAbwSection([], 5)).toBe(false);
+  });
+
+  it('abwAffected with warFinal + entries → shown', () => {
+    expect(shouldShowAbwSection([ae({ warFinal: true })], 3)).toBe(true);
+  });
+});
+
+// ─── onEdit-Fallback-Logik (nur bei DEBOUNCE_FAILED) ───────────────────────
+
+describe('onEdit fallback processing logic', () => {
+  /**
+   * Im onEdit-Handler wird NUR dann sofort verarbeitet, wenn
+   * resetDebounceTimer keinen Trigger erstellen konnte (Quota, Berechtigungen).
+   * Normale PENDING_EDITS während der laufenden Debounce-Periode sind
+   * kein Grund für sofortige Verarbeitung — der Debounce existiert, damit
+   * der Nutzer die Aufstellung vor der Mail korrigieren kann.
+   */
+  function shouldProcessImmediately(debounceFailed: boolean): boolean {
+    return debounceFailed;
+  }
+
+  it('debounce OK → NO immediate processing (waits for timer)', () => {
+    expect(shouldProcessImmediately(false)).toBe(false);
+  });
+
+  it('debounce FAILED → process immediately (no timer to wait for)', () => {
+    expect(shouldProcessImmediately(true)).toBe(true);
+  });
+});
+
+describe('rebuildAbwesenheitenInSaison: ABW_AFFECTED warFinal field', () => {
+  /**
+   * Das warFinal-Feld wird nur dann true, wenn BOTH:
+   *   wasFinalBefore (Status vorher "Final") AND warAufgestellt (Spieler war zugewiesen)
+   * wahr sind.
+   */
+  function computeWarFinal(wasFinalBefore: boolean, warAufgestellt: boolean): boolean {
+    return wasFinalBefore && warAufgestellt;
+  }
+
+  it('Final + aufgestellt → warFinal ~ true', () => {
+    expect(computeWarFinal(true, true)).toBe(true);
+  });
+
+  it('Geplant + aufgestellt → warFinal ~ false', () => {
+    expect(computeWarFinal(false, true)).toBe(false);
+  });
+
+  it('Final + NICHT aufgestellt → warFinal ~ false', () => {
+    expect(computeWarFinal(true, false)).toBe(false);
+  });
+
+  it('Geplant + NICHT aufgestellt → warFinal ~ false', () => {
+    expect(computeWarFinal(false, false)).toBe(false);
+  });
+});
+
+// ─── Empfänger-Inclusion-Logik (getAenderungenMeldenEmpfaenger) ─────────────
+
+describe('Empfänger inclusion logic', () => {
+  /**
+   * Entscheidungs-Logik pro Spieler:
+   *
+   *   Editor (email === currentUser): IMMER excluded
+   *   isKapitaen:     included (wenn nicht Editor)
+   *   isAffected:     included (wenn nicht Editor)
+   *   melden:         included (wenn nicht Editor)
+   */
+  function shouldInclude(
+    isKapitaen: boolean,
+    isAffected: boolean,
+    melden: boolean,
+    isEditor: boolean,
+  ): boolean {
+    if (isEditor) return false;
+    if (isKapitaen) return true;
+    if (isAffected) return true;
+    if (melden) return true;
+    return false;
+  }
+
+  it('Kapitän, nicht Editor → included', () => {
+    expect(shouldInclude(true, false, false, false)).toBe(true);
+  });
+
+  it('Kapitän = Editor → excluded (Selbst-Notifikation)', () => {
+    expect(shouldInclude(true, false, false, true)).toBe(false);
+  });
+
+  it('betroffener Spieler, nicht Editor → included', () => {
+    expect(shouldInclude(false, true, false, false)).toBe(true);
+  });
+
+  it('betroffener Spieler = Editor → excluded', () => {
+    expect(shouldInclude(false, true, false, true)).toBe(false);
+  });
+
+  it('melden-Checkbox, nicht Editor → included', () => {
+    expect(shouldInclude(false, false, true, false)).toBe(true);
+  });
+
+  it('melden-Checkbox = Editor → excluded', () => {
+    expect(shouldInclude(false, false, true, true)).toBe(false);
+  });
+
+  it('kein Grund, nicht Editor → excluded', () => {
+    expect(shouldInclude(false, false, false, false)).toBe(false);
+  });
+
+  it('kein Grund, Editor → excluded', () => {
+    expect(shouldInclude(false, false, false, true)).toBe(false);
+  });
+});
+
+describe('melden checkbox recognition', () => {
+  /**
+   * Robuster Check: true (boolean), 'TRUE', 'true', 1
+   */
+  function isMelden(raw: unknown): boolean {
+    return raw === true
+      || String(raw).toUpperCase() === 'TRUE'
+      || raw === 1;
+  }
+
+  it('boolean true → true', () => {
+    expect(isMelden(true)).toBe(true);
+  });
+
+  it('boolean false → false', () => {
+    expect(isMelden(false)).toBe(false);
+  });
+
+  it('string "TRUE" → true', () => {
+    expect(isMelden('TRUE')).toBe(true);
+  });
+
+  it('string "true" → true', () => {
+    expect(isMelden('true')).toBe(true);
+  });
+
+  it('string "false" → false', () => {
+    expect(isMelden('false')).toBe(false);
+  });
+
+  it('number 1 → true', () => {
+    expect(isMelden(1)).toBe(true);
+  });
+
+  it('number 0 → false', () => {
+    expect(isMelden(0)).toBe(false);
+  });
+
+  it('undefined → false', () => {
+    expect(isMelden(undefined)).toBe(false);
+  });
+});
+
+// ─── Saison-Zeilenformat für Änderungslog ───────────────────────────────────
+
+describe('formatSaisonRowForLog', () => {
+  /** Nachbildung der formatSaisonRowForLog-Helperfunktion aus ChangeTracker.ts */
+  function formatSaisonRowForLog(row: SaisonRowSnapshot, playerNames: string[]): string {
+    const parts: string[] = [];
+    if (row.gegner) parts.push(row.gegner);
+    if (row.startzeit) parts.push(row.startzeit);
+    if (row.heimAuswaerts) parts.push(row.heimAuswaerts);
+    for (let pi = 0; pi < row.playerAssignments.length; pi++) {
+      const v = row.playerAssignments[pi];
+      if (v) parts.push(`${playerNames[pi]}: ${v}`);
+    }
+    for (let ei = 0; ei < row.ersatz.length; ei++) {
+      if (row.ersatz[ei]) parts.push(`Ersatz ${ei + 1}: ${row.ersatz[ei]}`);
+    }
+    parts.push(`Status: ${row.status}`);
+    if (row.kommentar) parts.push(`Kommentar: ${row.kommentar}`);
+    return parts.join(' | ');
+  }
+
+  const names = ['Max', 'Anna', 'Tom'];
+
+  it('full row with all fields', () => {
+    const row: SaisonRowSnapshot = {
+      datum: '01.09.2026', gegner: 'ABC', startzeit: '20:00', heimAuswaerts: 'Heim',
+      playerAssignments: ['Einzel+Doppel', 'Einzel+Doppel', ''],
+      ersatz: ['Gast1', '', ''],
+      status: 'Final', kommentar: 'Treffpunkt 19:30',
+    };
+    const result = formatSaisonRowForLog(row, names);
+    expect(result).toBe('ABC | 20:00 | Heim | Max: Einzel+Doppel | Anna: Einzel+Doppel | Ersatz 1: Gast1 | Status: Final | Kommentar: Treffpunkt 19:30');
+  });
+
+  it('minimal row (only gegner and status)', () => {
+    const row: SaisonRowSnapshot = {
+      datum: '', gegner: 'DEF', startzeit: '', heimAuswaerts: '',
+      playerAssignments: ['', '', ''],
+      ersatz: ['', '', ''],
+      status: 'Geplant', kommentar: '',
+    };
+    expect(formatSaisonRowForLog(row, names)).toBe('DEF | Status: Geplant');
+  });
+
+  it('row with ✗ markers (absent players)', () => {
+    const row: SaisonRowSnapshot = {
+      datum: '', gegner: 'GHI', startzeit: '', heimAuswaerts: 'Auswärts',
+      playerAssignments: ['Einzel+Doppel', '✗ Urlaub', ''],
+      ersatz: ['', '', ''],
+      status: 'Geplant', kommentar: '',
+    };
+    const result = formatSaisonRowForLog(row, names);
+    expect(result).toContain('Max: Einzel+Doppel');
+    expect(result).toContain('Anna: ✗ Urlaub');
+  });
+});
+
+// ─── buildAbwesenheitenIndex: überlappende Abwesenheiten ────────────────────
+
+describe('buildAbwesenheitenIndex merge logic', () => {
+  /**
+   * Merge-Logik: mehrere Abwesenheiten für denselben Spieler am selben Tag
+   * werden zu einem String zusammengeführt: ✗ Komm1, Komm2
+   */
+  function mergeAbsences(abwesenheiten: { name: string; kommentar: string }[]): string {
+    const labels = abwesenheiten.map(a => a.kommentar || 'abwesend');
+    return `✗ ${labels.join(', ')}`;
+  }
+
+  it('single absence → ✗ Urlaub', () => {
+    expect(mergeAbsences([{ name: 'Max', kommentar: 'Urlaub' }])).toBe('✗ Urlaub');
+  });
+
+  it('no comment → ✗ abwesend', () => {
+    expect(mergeAbsences([{ name: 'Max', kommentar: '' }])).toBe('✗ abwesend');
+  });
+
+  it('two overlapping absences → ✗ Urlaub, Verletzung', () => {
+    expect(mergeAbsences([
+      { name: 'Max', kommentar: 'Urlaub' },
+      { name: 'Max', kommentar: 'Verletzung' },
+    ])).toBe('✗ Urlaub, Verletzung');
+  });
+
+  it('three overlapping → ✗ Urlaub, Verletzung, Krank', () => {
+    expect(mergeAbsences([
+      { name: 'Max', kommentar: 'Urlaub' },
+      { name: 'Max', kommentar: 'Verletzung' },
+      { name: 'Max', kommentar: 'Krank' },
+    ])).toBe('✗ Urlaub, Verletzung, Krank');
+  });
+});
+
+// ─── Status-Meldung in der Mail (AbwAffectedEntry) ──────────────────────────
+
+describe('AbwAffectedEntry status message', () => {
+  /**
+   * Die Status-Meldung in der Mail hängt von warAufgestellt, warFinal
+   * und der validierung ab.
+   */
+  function statusText(warAufgestellt: boolean, warFinal: boolean, validierung: string): string {
+    if (warAufgestellt) {
+      if (warFinal) {
+        if (validierung) {
+          return `War aufgestellt (Final → Geplant). Validierung: ${validierung}`;
+        }
+        return 'War aufgestellt (Final → Geplant) — Bitte Spieltag prüfen und Status auf Final setzen.';
+      }
+      return 'War aufgestellt.';
+    }
+    return 'Stand als Ersatz zur Verfügung';
+  }
+
+  it('warFinal=true + Validierung → zeigt Validierungsmeldungen', () => {
+    expect(statusText(true, true, 'Nur 3/4 Einzel | Nur 2/4 Doppel'))
+      .toBe('War aufgestellt (Final → Geplant). Validierung: Nur 3/4 Einzel | Nur 2/4 Doppel');
+  });
+
+  it('warFinal=true, keine Validierung → Aufforderung zum Prüfen', () => {
+    expect(statusText(true, true, ''))
+      .toBe('War aufgestellt (Final → Geplant) — Bitte Spieltag prüfen und Status auf Final setzen.');
+  });
+
+  it('warAufgestellt=true, warFinal=false (korrigiert) → kein Alarm', () => {
+    expect(statusText(true, false, ''))
+      .toBe('War aufgestellt.');
+  });
+
+  it('nicht aufgestellt → Ersatz-Hinweis', () => {
+    expect(statusText(false, false, ''))
+      .toBe('Stand als Ersatz zur Verfügung');
+  });
+});

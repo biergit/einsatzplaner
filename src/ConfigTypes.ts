@@ -2,9 +2,8 @@ enum COL_SPIELER {
   Name = 1,
   Email = 2,
   Rang = 3,
-  Aktiv = 4,
-  AenderungenMelden = 5,
-  Rolle = 6,
+  AenderungenMelden = 4,
+  Rolle = 5,
 }
 
 enum COL_ABWESENHEITEN {

@@ -95,7 +95,7 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 | Sheet | Zweck |
 |-------|-------|
 | **Dokumentation** | Erläuterung aller Spalten, Funktionen und des Workflows |
-| **Spieler** | Name, Email (optional), Rang, Aktiv, Aufstellungsänderungen melden, Rolle |
+| **Spieler** | Name, Email (optional), Rang, Aufstellungsänderungen melden, Rolle |
 | **Abwesenheiten** | Spieler, Von, Bis, Kommentar |
 | **Saison** | Zentrale Übersicht: jeder Tag eine Zeile, Spieltage mit Gegner/Aufstellung. Abwesende Spieler (✗) sind rot hinterlegt. |
 | **Änderungslog** | Automatisches Protokoll aller Änderungen (versteckt) |
@@ -125,9 +125,18 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 
 | Rolle | Bedeutung |
 |-------|-----------|
-| `Kapitän` | Erhält Änderungs-Mails immer (auch ohne Checkbox). Bekommt nach dem E-Mail-Versand einen Hinweis über eingesetzte Spieler ohne hinterlegte E-Mail-Adresse |
+| `Kapitän` | Erhält Änderungs-Mails immer (auch ohne Checkbox). In seiner Mail erscheint eine Tabelle mit Spielern ohne hinterlegte E-Mail-Adresse und deren geänderten Einsätzen (neu / geändert / entfernt). |
 | *(leer)* | Normales Teammitglied – erhält Änderungs-Mails nur bei gesetzter Checkbox |
 
 ## Spieler ohne hinterlegte E-Mail-Adresse
 
-E-Mail-Adressen sind optional. Hat ein eingesetzter Spieler keine E-Mail hinterlegt, bekommt der Kapitän nach dem Versand der Einsatzpläne eine separate Nachricht mit der Liste dieser Spieler und ihren konkreten Spieltagen – damit er sie persönlich kontaktieren kann.
+Hat ein Spieler keine E-Mail hinterlegt, wird in der Änderungsmail für den Kapitän eine Tabelle eingefügt:
+
+```
+Ohne E-Mail-Adresse:
+Spieltag              | Spieler          | Einsatz
+01.09.2026 — ABC      | Max Mustermann   | Einzel+Doppel
+01.09.2026 — ABC      | Anna Beispiel    | -
+```
+
+Daran erkennt der Kapitän, welche Spieler ohne E-Mail neu aufgestellt, geändert oder entfernt (`-`) wurden — und kann sie persönlich informieren. Diese Sektion erscheint **nicht** in den Mails anderer Empfänger.

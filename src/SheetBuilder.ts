@@ -35,10 +35,10 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     [`${einstellungen.teamName} – Saison ${einstellungen.saison}`, '', ''],
     ['', '', ''],
     ['SHEETS IM ÜBERBLICK', '', ''],
-    ['Spieler', 'Stammdaten', 'Name, Email, Rang, Aktiv, Aufstellungsänderungen melden, Rolle'],
-    ['Abwesenheiten', 'Von Spielern gepflegt', 'Spieler, Von, Bis, Kommentar, Validierungsmeldungen'],
+    ['Spieler', 'Stammdaten', 'Name, Email, Rang, Aufstellungsänderungen melden, Rolle'],
+    ['Abwesenheiten', 'Von Spielern gepflegt', 'Spieler, Von, Bis, Kommentar, Validierungsmeldungen. Mehrere überlappende Abwesenheiten (z.B. Urlaub + Verletzung) sind erlaubt — die Kommentare werden mit Komma zusammengefügt: ✗ Urlaub, Verletzung'],
     ['Saison', 'Zentrale Übersicht, ein Tag pro Zeile', 'Datum, Wochentag, Gegner, Startzeit, Heim/Auswärts, Spieler-Spalten, Ersatz, Status, Kommentar, Validierungsmeldungen'],
-    ['Änderungslog', 'Automatisch (versteckt)', 'Protokolliert alle Änderungen. Snapshot-Diff für Abwesenheiten/Spieler (Cut+Paste wird erkannt).'],
+    ['Änderungslog', 'Automatisch (versteckt)', 'Protokolliert alle Änderungen. Snapshot-Diff für Abwesenheiten/Spieler (Cut+Paste wird erkannt). Saison-Änderungen werden zeilenweise (alte Zeile / neue Zeile) protokolliert.'],
     ['', '', ''],
     ['SPIELER-SPALTEN', '', ''],
     ['Aufstellungsänderungen melden', 'Checkbox', 'Bei gesetzter Checkbox: Über Aufstellungsänderungen der Mannschaft per E-Mail informieren.'],
@@ -65,7 +65,8 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['', '', ''],
     ['BENACHRICHTIGUNGEN', '', ''],
     ['Änderungs-Mail', `Nach ${einstellungen.debounceMinuten} Min. an Kapitän (immer) + Checkbox-Inhaber`, 'Nur bei Saison-Änderungen (Aufstellung, Gegner, Startzeit, Status) und Abwesenheiten mit Spieltags-Bezug. Neue, nur geplante Spieltage lösen keine Mail aus.'],
-    ['Aufstellungs-Mail', 'HTML mit persönlichem Plan + Gesamtspielplan', 'Spieler ohne hinterlegte E-Mail-Adresse → Kapitän-Mail mit Spieltag-Details. Ersatzspieler + Nicht-Stammspieler (Rang > 4) gelb hervorgehoben.'],
+    ['Aufstellungs-Mail', 'HTML mit persönlichem Plan + Gesamtspielplan', 'Ersatzspieler + Nicht-Stammspieler (Rang > 4) gelb hervorgehoben. Spieler ohne E-Mail siehe Änderungs-Mail.'],
+    ['Ohne-Email-Hinweis', 'In der Änderungs-Mail (nur für Kapitän)', 'Tabelle mit Spieltag, Spieler, Einsatz (neu/geändert/entfernt) für Spieler ohne hinterlegte E-Mail-Adresse.'],
   ];
 
   const numCols = 3;
@@ -80,25 +81,23 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
 
 function buildSpielerSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.Sheet {
   const sheet = getOrCreateSheet(SHEET_NAMES.SPIELER);
-  const headers = ['Name', 'Email', 'Rang', 'Aktiv', 'Aufstellungsänderungen melden', 'Rolle'];
+  const headers = ['Name', 'Email', 'Rang', 'Aufstellungsänderungen melden', 'Rolle'];
   const numCols = headers.length;
   sheet.getRange(1, 1, 1, numCols).setValues([headers]); formatHeader(sheet, numCols);
 
   if (config.spieler.length > 0) {
     sheet.getRange(2, 1, config.spieler.length, numCols).setValues(
-      config.spieler.map(s => [s.name, s.email, s.rang, true, s.aenderungenMelden, s.rolle])
+      config.spieler.map(s => [s.name, s.email, s.rang, s.aenderungenMelden, s.rolle])
     );
   }
 
   sheet.setColumnWidth(COL_SPIELER.Name, 200); sheet.setColumnWidth(COL_SPIELER.Email, 280);
-  sheet.setColumnWidth(COL_SPIELER.Rang, 60); sheet.setColumnWidth(COL_SPIELER.Aktiv, 60);
+  sheet.setColumnWidth(COL_SPIELER.Rang, 60);
   sheet.setColumnWidth(COL_SPIELER.AenderungenMelden, 240); sheet.setColumnWidth(COL_SPIELER.Rolle, 100);
 
   const lastRow = Math.max(sheet.getMaxRows() - 1, config.spieler.length + 50);
   sheet.getRange(2, COL_SPIELER.Rang, lastRow, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireNumberGreaterThan(0).setAllowInvalid(true).build());
-  sheet.getRange(2, COL_SPIELER.Aktiv, lastRow, 1).setDataValidation(
-    SpreadsheetApp.newDataValidation().requireCheckbox().build());
   sheet.getRange(2, COL_SPIELER.AenderungenMelden, lastRow, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireCheckbox().build());
   sheet.getRange(2, COL_SPIELER.Rolle, lastRow, 1).setDataValidation(
@@ -118,8 +117,8 @@ function buildAbwesenheitenSheet(config: SheetConfig): GoogleAppsScript.Spreadsh
     sheet.getRange(2, 1, config.abwesenheiten.length, numCols).setValues(
       config.abwesenheiten.map(a => [
         a.spieler,
-        `${pad(a.von.getDate())}.${pad(a.von.getMonth() + 1)}.${a.von.getFullYear()}`,
-        `${pad(a.bis.getDate())}.${pad(a.bis.getMonth() + 1)}.${a.bis.getFullYear()}`,
+        `${pad2(a.von.getDate())}.${pad2(a.von.getMonth() + 1)}.${a.von.getFullYear()}`,
+        `${pad2(a.bis.getDate())}.${pad2(a.bis.getMonth() + 1)}.${a.bis.getFullYear()}`,
         a.kommentar,
         '',
       ])
@@ -144,6 +143,14 @@ function buildAbwesenheitenSheet(config: SheetConfig): GoogleAppsScript.Spreadsh
   }
 
   sheet.getRange(2, COL_ABWESENHEITEN.Von, lastRow, 2).setNumberFormat('DD.MM.YYYY');
+  // Kalender-Element (Date Picker) für Von und Bis
+  const dateValidation = SpreadsheetApp.newDataValidation()
+    .requireDate()
+    .setAllowInvalid(true)
+    .setHelpText('Datum im Kalender auswählen (oder frei eingeben)')
+    .build();
+  sheet.getRange(2, COL_ABWESENHEITEN.Von, lastRow, 1).setDataValidation(dateValidation);
+  sheet.getRange(2, COL_ABWESENHEITEN.Bis, lastRow, 1).setDataValidation(dateValidation);
   sheet.setFrozenRows(1);
   return sheet;
 }
@@ -264,8 +271,6 @@ function buildAenderungslogSheet(): GoogleAppsScript.Spreadsheet.Sheet {
   sheet.setFrozenRows(1); sheet.hideSheet();
   return sheet;
 }
-
-function pad(n: number): string { return n.toString().padStart(2, '0'); }
 
 function colLetter(col: number): string {
   let s = '';

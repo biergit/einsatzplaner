@@ -30,6 +30,8 @@ interface AbwAffectedEntry {
   warAufgestellt: boolean;
   /** true wenn der Spieltag-Status vor dem Revert "Final" war */
   warFinal: boolean;
+  /** Validierungsmeldungen des Spieltags nach der Änderung (für Mail-Hinweis) */
+  validierung: string;
 }
 
 interface SaisonRowSnapshot {
@@ -50,7 +52,12 @@ interface SaisonRowSnapshot {
  * Simple-Trigger mit authMode !== FULL werden ignoriert (haben keine ScriptApp-Rechte).
  */
 function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
-  if (e.authMode !== ScriptApp.AuthMode.FULL) return;
+  if (e.authMode !== ScriptApp.AuthMode.FULL) {
+    Logger.log('onEdit: Simple-Trigger (LIMITED) — ignoriert');
+    return;
+  }
+
+  Logger.log(`onEdit: Installierbarer-Trigger (FULL) — Sheet="${e.range.getSheet().getName()}" Row=${e.range.getRow()} Col=${e.range.getColumn()}`);
 
   const props = PropertiesService.getScriptProperties();
   if (props.getProperty('SHEET_BUILDER_RUNNING') === 'true') return;
@@ -65,30 +72,37 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
   const col = range.getColumn();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Saison: Gegner → Status autom. setzen; Validierung aktualisieren
-  if (sheetName === SHEET_NAMES.SAISON && row >= 2) {
-    if (col === saisonGegnerCol()) {
-      const newValue = e.value !== undefined ? String(e.value) : '';
-      const statusCell = sheet.getRange(row, saisonStatusCol());
-      if (newValue.trim()) {
-        if (!String(statusCell.getValue() || '').trim()) statusCell.setValue('Geplant');
-      } else {
-        statusCell.setValue('');
+  // Sheet-spezifische Aktionen (gekapselt, damit addPendingEdit + resetDebounceTimer
+  // auch bei Fehlern in diesen Blöcken garantiert laufen)
+  try {
+    // Saison: Gegner → Status autom. setzen; Validierung aktualisieren
+    if (sheetName === SHEET_NAMES.SAISON && row >= 2) {
+      if (col === saisonGegnerCol()) {
+        const newValue = e.value !== undefined ? String(e.value) : '';
+        const statusCell = sheet.getRange(row, saisonStatusCol());
+        if (newValue.trim()) {
+          if (!String(statusCell.getValue() || '').trim()) statusCell.setValue('Geplant');
+        } else {
+          statusCell.setValue('');
+        }
       }
+      validateAndUpdateSaisonRow(range);
     }
-    validateAndUpdateSaisonRow(range);
-  }
 
-  // Abwesenheiten: ✗-Markierungen im Saison-Sheet sofort neu aufbauen
-  if (sheetName === SHEET_NAMES.ABWESENHEITEN && row >= 2) {
-    rebuildAbwesenheitenInSaison(ss);
-    restoreAbwesenheitenValidations(sheet);
-    validateAbwesenheitRow(sheet, row);
-  }
+    // Abwesenheiten: ✗-Markierungen im Saison-Sheet sofort neu aufbauen
+    if (sheetName === SHEET_NAMES.ABWESENHEITEN && row >= 2) {
+      Logger.log(`onEdit: Abwesenheiten-Edit Zeile ${row}, Spalte ${col} → rebuildAbwesenheitenInSaison`);
+      rebuildAbwesenheitenInSaison(ss);
+      restoreAbwesenheitenValidations(sheet);
+      validateAbwesenheitRow(sheet, row);
+    }
 
-  // Spieler: Data-Validations (Checkboxen, Dropdowns) nach Cut+Paste wiederherstellen
-  if (sheetName === SHEET_NAMES.SPIELER && row >= 2) {
-    restoreSpielerValidations(sheet);
+    // Spieler: Data-Validations (Checkboxen, Dropdowns) nach Cut+Paste wiederherstellen
+    if (sheetName === SHEET_NAMES.SPIELER && row >= 2) {
+      restoreSpielerValidations(sheet);
+    }
+  } catch (err) {
+    Logger.log(`onEdit: Fehler bei Sheet-Aktionen — ${err}`);
   }
 
   // Änderung für den Debounce sammeln
@@ -115,6 +129,26 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
   });
 
   resetDebounceTimer();
+
+  // Fallback: Falls resetDebounceTimer keinen Trigger erstellen konnte
+  // (z.B. Quota-Limit), wird DEBOUNCE_FAILED gesetzt. In diesem Fall
+  // die Änderungen sofort verarbeiten, damit sie nicht verloren gehen.
+  // NIEMALS sofort verarbeiten, nur weil PENDING_EDITS nicht leer ist —
+  // das ist der Normalfall während der laufenden Debounce-Periode.
+  // Der Debounce existiert, damit der Nutzer Zeit hat, die Aufstellung
+  // zu korrigieren, bevor die Mail verschickt wird.
+  if (props.getProperty('DEBOUNCE_FAILED') === 'true') {
+    Logger.log('onEdit: DEBOUNCE_FAILED — sofortige Verarbeitung');
+    props.deleteProperty('DEBOUNCE_FAILED');
+    try {
+      for (const t of ScriptApp.getProjectTriggers()) {
+        if (t.getHandlerFunction() === 'onDebounceTimer') ScriptApp.deleteTrigger(t);
+      }
+      flushPendingChanges();
+    } catch (err) {
+      Logger.log(`onEdit: flushPendingChanges-Fallback fehlgeschlagen — ${err}`);
+    }
+  }
 }
 
 // ─── Abwesenheiten → Saison-Sheet sofort aktualisieren ─────────────────────
@@ -135,9 +169,6 @@ function rebuildAbwesenheitenInSaison(ss: GoogleAppsScript.Spreadsheet.Spreadshe
   const spielerNames = readSpielerNames(ss);
   const numPlayers = spielerNames.length;
   if (numPlayers === 0) return;
-
-  const aktiveSpieler = readAktiveSpieler(ss.getSheetByName(SHEET_NAMES.SPIELER)!);
-  if (!aktiveSpieler || aktiveSpieler.length === 0) return;
 
   const allAbw = buildAbwesenheitenIndex(ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN)!);
   const dates = readSaisonDates(saisonSheet, lastRow);
@@ -172,7 +203,7 @@ function rebuildAbwesenheitenInSaison(ss: GoogleAppsScript.Spreadsheet.Spreadshe
 
       if (abwDisplay) {
         if (abwDisplay.startsWith('✗')) {
-          if (!current || !current.startsWith('✗')) {
+          if (!current || !current.startsWith('✗') || current !== abwDisplay) {
             const warAufgestellt = !!(current && !current.startsWith('✗'));
             if (warAufgestellt && wasFinalBefore) {
               statusValues[r][0] = 'Geplant';
@@ -182,7 +213,7 @@ function rebuildAbwesenheitenInSaison(ss: GoogleAppsScript.Spreadsheet.Spreadshe
             playerChanged = true;
 
             // Nur protokollieren wenn es ein Spieltag mit Gegner ist
-            if (isSpieltag) {
+            if (isSpieltag && warAufgestellt) {
               const datumStr = Utilities.formatDate(d, 'Europe/Berlin', 'dd.MM.yyyy');
               affected.push({
                 datumStr,
@@ -192,6 +223,7 @@ function rebuildAbwesenheitenInSaison(ss: GoogleAppsScript.Spreadsheet.Spreadshe
                 spielerName: spielerNames[pi],
                 warAufgestellt,
                 warFinal: wasFinalBefore && warAufgestellt,
+                validierung: '',
               });
             }
           }
@@ -214,17 +246,43 @@ function rebuildAbwesenheitenInSaison(ss: GoogleAppsScript.Spreadsheet.Spreadshe
 
   if (playerChanged || statusChanged) {
     const refreshedAllAbw = buildAbwesenheitenIndex(ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN)!);
+    const allSpieler: Spieler[] = spielerNames.map(name => ({
+      name, email: '', rang: 99, aenderungenMelden: false, rolle: ''
+    }));
+    const ersatzData = saisonSheet.getRange(2, saisonErsatzCol(0), numRows, 3).getValues();
     const validierungValues: string[][] = [];
+    const validierungPerRow = new Map<string, string>();
     for (let r = 0; r < numRows; r++) {
       const gegner = String(gegnerCols[r][0] || '').trim();
-      validierungValues.push([gegner ? computeValidierung(allPlayerCols[r], dates[r], aktiveSpieler, refreshedAllAbw, saisonSheet, r + 2) : '']);
+      if (!gegner) { validierungValues.push(['']); continue; }
+      const v = computeValidierung(allPlayerCols[r], dates[r], allSpieler, refreshedAllAbw,
+        [String(ersatzData[r][0] || ''), String(ersatzData[r][1] || ''), String(ersatzData[r][2] || '')]);
+      validierungValues.push([v]);
+      validierungPerRow.set(`${r}|${gegner}`, v);
     }
     saisonSheet.getRange(2, saisonValidierungCol(), numRows, 1).setValues(validierungValues);
+
+    // Betroffenen Einträgen die Validierungsmeldungen zuweisen
+    for (const a of affected) {
+      for (let r = 0; r < numRows; r++) {
+        const gegner = String(gegnerCols[r][0] || '').trim();
+        if (!gegner) continue;
+        const datumStr = dates[r] ? Utilities.formatDate(dates[r], 'Europe/Berlin', 'dd.MM.yyyy') : '';
+        if (a.datumStr === datumStr && a.gegner === gegner) {
+          a.validierung = validierungPerRow.get(`${r}|${gegner}`) || '';
+          break;
+        }
+      }
+    }
   }
 
   // Betroffene Spieltage für die spätere Mail-Anreicherung speichern
   const props = PropertiesService.getScriptProperties();
   props.setProperty('ABW_AFFECTED', JSON.stringify(affected));
+  if (affected.length > 0) {
+    const finalCount = affected.filter(a => a.warFinal).length;
+    Logger.log(`rebuildAbwesenheitenInSaison: ${affected.length} betroffene Spieltage (davon ${finalCount} mit Final→Geplant-Revert)`);
+  }
 }
 
 // ─── Formatierungs-Helfer ──────────────────────────────────────────────────
@@ -241,8 +299,8 @@ function formatMultiCellEdit(
     const row = range.getRow();
     const data = sheet.getRange(row, 1, 1, COL_ABWESENHEITEN.Kommentar).getValues()[0];
     const spieler = String(data[COL_ABWESENHEITEN.Spieler - 1] || '').trim();
-    const von = toDateSafe(data[COL_ABWESENHEITEN.Von - 1]);
-    const bis = toDateSafe(data[COL_ABWESENHEITEN.Bis - 1]);
+    const von = toDate(data[COL_ABWESENHEITEN.Von - 1]);
+    const bis = toDate(data[COL_ABWESENHEITEN.Bis - 1]);
     const kommentar = String(data[COL_ABWESENHEITEN.Kommentar - 1] || '').trim();
     const vonStr = von ? Utilities.formatDate(von, 'Europe/Berlin', 'dd.MM.yyyy') : '-';
     const bisStr = bis ? Utilities.formatDate(bis, 'Europe/Berlin', 'dd.MM.yyyy') : '-';
@@ -287,8 +345,8 @@ function formatTimeForLog(val: unknown): string {
 function validateAbwesenheitRow(sheet: GoogleAppsScript.Spreadsheet.Sheet, row: number): void {
   const data = sheet.getRange(row, 1, 1, COL_ABWESENHEITEN.Validierung).getValues()[0];
   const spieler = String(data[COL_ABWESENHEITEN.Spieler - 1] || '').trim();
-  const von = toDateSafe(data[COL_ABWESENHEITEN.Von - 1]);
-  const bis = toDateSafe(data[COL_ABWESENHEITEN.Bis - 1]);
+  const von = toDate(data[COL_ABWESENHEITEN.Von - 1]);
+  const bis = toDate(data[COL_ABWESENHEITEN.Bis - 1]);
 
   // Nur validieren wenn mindestens ein Feld gefüllt ist
   if (!spieler && !von && !bis) {
@@ -309,7 +367,7 @@ function validateAbwesenheitRow(sheet: GoogleAppsScript.Spreadsheet.Sheet, row: 
 
 // ─── Data-Validation nach Cut+Paste wiederherstellen ───────────────────────
 
-/** Stellt Spieler-Dropdown und Datumsformat im Abwesenheiten-Sheet wieder her. */
+/** Stellt Spieler-Dropdown, Datumsformat und Kalender-Picker im Abwesenheiten-Sheet wieder her. */
 function restoreAbwesenheitenValidations(sheet: GoogleAppsScript.Spreadsheet.Sheet): void {
   const lastRow = Math.max(sheet.getMaxRows() - 1, 2);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -324,6 +382,14 @@ function restoreAbwesenheitenValidations(sheet: GoogleAppsScript.Spreadsheet.She
     }
   }
   sheet.getRange(2, COL_ABWESENHEITEN.Von, lastRow, 2).setNumberFormat('DD.MM.YYYY');
+  // Kalender-Element (Date Picker) nach Cut+Paste wiederherstellen
+  const dateValidation = SpreadsheetApp.newDataValidation()
+    .requireDate()
+    .setAllowInvalid(true)
+    .setHelpText('Datum im Kalender auswählen (oder frei eingeben)')
+    .build();
+  sheet.getRange(2, COL_ABWESENHEITEN.Von, lastRow, 1).setDataValidation(dateValidation);
+  sheet.getRange(2, COL_ABWESENHEITEN.Bis, lastRow, 1).setDataValidation(dateValidation);
 }
 
 /** Stellt Checkboxen und Dropdowns im Spieler-Sheet wieder her. */
@@ -331,8 +397,6 @@ function restoreSpielerValidations(sheet: GoogleAppsScript.Spreadsheet.Sheet): v
   const lastRow = Math.max(sheet.getMaxRows() - 1, 2);
   sheet.getRange(2, COL_SPIELER.Rang, lastRow, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireNumberGreaterThan(0).setAllowInvalid(true).build());
-  sheet.getRange(2, COL_SPIELER.Aktiv, lastRow, 1).setDataValidation(
-    SpreadsheetApp.newDataValidation().requireCheckbox().build());
   sheet.getRange(2, COL_SPIELER.AenderungenMelden, lastRow, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireCheckbox().build());
   sheet.getRange(2, COL_SPIELER.Rolle, lastRow, 1).setDataValidation(
@@ -353,8 +417,8 @@ function readAbwSnapshot(sheet: GoogleAppsScript.Spreadsheet.Sheet | null): Shee
   const rows: SheetRowSnapshot[] = [];
   for (let r = 0; r < data.length; r++) {
     const spieler = String(data[r][COL_ABWESENHEITEN.Spieler - 1] || '').trim();
-    const von = toDateSafe(data[r][COL_ABWESENHEITEN.Von - 1]);
-    const bis = toDateSafe(data[r][COL_ABWESENHEITEN.Bis - 1]);
+    const von = toDate(data[r][COL_ABWESENHEITEN.Von - 1]);
+    const bis = toDate(data[r][COL_ABWESENHEITEN.Bis - 1]);
     const kommentar = String(data[r][COL_ABWESENHEITEN.Kommentar - 1] || '').trim();
     if (!spieler && !von && !bis && !kommentar) continue;
     const vonStr = von ? Utilities.formatDate(von, 'Europe/Berlin', 'dd.MM.yyyy') : '';
@@ -370,7 +434,7 @@ function readAbwSnapshot(sheet: GoogleAppsScript.Spreadsheet.Sheet | null): Shee
 
 /**
  * Liest alle belegten Zeilen des Spieler-Sheets als Snapshot-Array.
- * Key = `name|email|rang|aktiv|melden|rolle`.
+ * Key = `name|email|rang|melden|rolle`.
  */
 function readSpielerSnapshot(sheet: GoogleAppsScript.Spreadsheet.Sheet | null): SheetRowSnapshot[] {
   if (!sheet) return [];
@@ -383,13 +447,12 @@ function readSpielerSnapshot(sheet: GoogleAppsScript.Spreadsheet.Sheet | null): 
     if (!name) continue;
     const email = String(data[r][COL_SPIELER.Email - 1] || '').trim();
     const rang = String(data[r][COL_SPIELER.Rang - 1] || '').trim();
-    const aktiv = data[r][COL_SPIELER.Aktiv - 1] === true ? 'ja' : '';
     const melden = data[r][COL_SPIELER.AenderungenMelden - 1] === true ? 'ja' : '';
     const rolle = String(data[r][COL_SPIELER.Rolle - 1] || '').trim();
     rows.push({
       row: r + 2,
-      key: `${name}|${email}|${rang}|${aktiv}|${melden}|${rolle}`,
-      display: `Name: ${name} | Email: ${email || '-'} | Rang: ${rang} | Aktiv: ${aktiv || 'nein'} | Melden: ${melden || 'nein'} | Rolle: ${rolle || '-'}`,
+      key: `${name}|${email}|${rang}|${melden}|${rolle}`,
+      display: `Name: ${name} | Email: ${email || '-'} | Rang: ${rang} | Melden: ${melden || 'nein'} | Rolle: ${rolle || '-'}`,
     });
   }
   return rows;
@@ -459,25 +522,33 @@ function addPendingEdit(entry: ChangeEntry): void {
  * Stellt sicher, dass ein onDebounceTimer-Trigger existiert.
  * Während Bulk-Operationen (SHEET_BUILDER_RUNNING oder BULK_EDIT) wird
  * kein Timer angelegt — der Aufrufer muss das selbst am Ende tun.
+ *
+ * Falls die Trigger-Erstellung fehlschlägt (Quota, Berechtigungen), wird
+ * ein DEBOUNCE_FAILED-Flag gesetzt. Der nächste onEdit-Aufruf erkennt das
+ * und verarbeitet die ausstehenden Änderungen sofort.
  */
 function resetDebounceTimer(): void {
-  try {
-    const props = PropertiesService.getScriptProperties();
-    if (props.getProperty('SHEET_BUILDER_RUNNING') === 'true') return;
-    if (props.getProperty('BULK_EDIT') === 'true') return;
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('SHEET_BUILDER_RUNNING') === 'true') return;
+  if (props.getProperty('BULK_EDIT') === 'true') return;
 
-    for (const t of ScriptApp.getProjectTriggers()) {
-      if (t.getHandlerFunction() === 'onDebounceTimer') ScriptApp.deleteTrigger(t);
-    }
-    const minuten = SHEET_CONFIG.einstellungen.debounceMinuten;
+  for (const t of ScriptApp.getProjectTriggers()) {
+    if (t.getHandlerFunction() === 'onDebounceTimer') ScriptApp.deleteTrigger(t);
+  }
+  const minuten = SHEET_CONFIG.einstellungen.debounceMinuten;
+  try {
     ScriptApp.newTrigger('onDebounceTimer')
       .timeBased().after(minuten * 60 * 1000).create();
-  } catch (_) {
+    Logger.log(`resetDebounceTimer: Timer in ${minuten} Min. erstellt`);
+  } catch (e) {
+    Logger.log(`resetDebounceTimer: Trigger-Erstellung fehlgeschlagen — ${e}`);
+    props.setProperty('DEBOUNCE_FAILED', 'true');
   }
 }
 
 /** Wird vom Debounce-Timer aufgerufen. Löscht den Timer und leert den Pending-Puffer. */
 function onDebounceTimer(): void {
+  Logger.log('onDebounceTimer: Timer ausgelöst');
   for (const t of ScriptApp.getProjectTriggers()) {
     if (t.getHandlerFunction() === 'onDebounceTimer') ScriptApp.deleteTrigger(t);
   }
@@ -499,6 +570,11 @@ function onDebounceTimer(): void {
  *   3. Alle Einträge werden ins Änderungslog-Blatt geschrieben (permanentes Log)
  *   4. Speichert neue Snapshots für den nächsten Debounce-Durchlauf
  *   5. Sendet eine Mail-Benachrichtigung (in-memory, kein Sheet-Readback)
+ *
+ * Wichtig: Die Mail wird auch dann gesendet, wenn ABW_AFFECTED einen
+ * Status-Revert (Final→Geplant) verzeichnet, selbst wenn die Snapshot-Diffs
+ * keine Log-Einträge geliefert haben. So werden Kapitän und betroffene
+ * Spieler immer über Aufstellungs-Änderungen durch Abwesenheiten informiert.
  */
 function flushPendingChanges(): void {
   const props = PropertiesService.getScriptProperties();
@@ -510,6 +586,8 @@ function flushPendingChanges(): void {
   const saisonSnapshotRaw = props.getProperty('SAISON_SNAPSHOT');
   const abwAffectedRaw = props.getProperty('ABW_AFFECTED');
 
+  Logger.log(`flushPendingChanges: gestartet | PENDING_EDITS=${pendingRaw.length} Zch | SNAP=${!!saisonSnapshotRaw} | ABW_AFFECTED=${!!abwAffectedRaw}`);
+
   // Sofort löschen, damit bei einem Crash keine veralteten Daten liegen bleiben
   props.deleteProperty('PENDING_EDITS');
   props.deleteProperty('ABW_SNAPSHOT');
@@ -519,7 +597,10 @@ function flushPendingChanges(): void {
 
   const pendingEdits: ChangeEntry[] = JSON.parse(pendingRaw);
   const hasAnyPending = pendingEdits.length > 0 || abwSnapshotRaw || spielerSnapshotRaw || saisonSnapshotRaw;
-  if (!hasAnyPending) return;
+  if (!hasAnyPending) {
+    Logger.log('flushPendingChanges: kein Pending + keine Snapshots → return');
+    return;
+  }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const logEntries: ChangeEntry[] = [];
@@ -545,15 +626,14 @@ function flushPendingChanges(): void {
     const snapshot: SaisonRowSnapshot[] = JSON.parse(saisonSnapshotRaw);
     const current = readSaisonSnapshot(ss.getSheetByName(SHEET_NAMES.SAISON)!);
     saisonDiffs = computeSaisonDiff(snapshot, current);
-    // Saison-Änderungen als kompakte Log-Einträge schreiben
+    // Saison-Änderungen als zeilenweise Log-Einträge schreiben
     for (const mod of saisonDiffs.modified) {
-      const modChanges = mod.changedCells.map(c => `${c.label}: ${c.oldVal || '-'} → ${c.newVal || '-'}`).join(' | ');
       logEntries.push({
         timestamp: Date.now(),
         sheetName: SHEET_NAMES.SAISON,
         rangeA1: mod.datum,
-        alterWert: mod.gegner,
-        neuerWert: modChanges,
+        alterWert: formatSaisonRowForLog(mod.oldRow),
+        neuerWert: formatSaisonRowForLog(mod.newRow),
         bearbeiter,
       });
     }
@@ -590,7 +670,37 @@ function flushPendingChanges(): void {
   saveSheetSnapshots(ss);
 
   // ── 7. Mail-Benachrichtigung (in-memory, kein Sheet-Readback) ──
-  if (logEntries.length === 0) {
+
+  // ABW_AFFECTED vor dem Early-Return laden, damit Status-Reverts
+  // (Final→Geplant) auch dann gemeldet werden, wenn die Snapshot-Diffs
+  // keine Log-Einträge produziert haben.
+  let abwAffected: AbwAffectedEntry[] | null = null;
+  if (abwAffectedRaw) {
+    abwAffected = JSON.parse(abwAffectedRaw);
+    if (abwAffected && abwAffected.length === 0) abwAffected = null;
+  }
+
+  // Nachkontrolle: Wurde der Spieltag während der Debounce-Zeit repariert
+  // (Status wieder auf Final) → keine "Nachplanung nötig"-Meldung mehr
+  if (abwAffected && saisonDiffs) {
+    const currentByKey = new Map<string, SaisonRowSnapshot>();
+    for (const m of saisonDiffs.modified) {
+      currentByKey.set(`${m.datum}|${m.gegner}`, m.newRow);
+    }
+    for (const a of abwAffected) {
+      if (a.warFinal) {
+        const cur = currentByKey.get(`${a.datumStr}|${a.gegner}`);
+        if (cur && cur.status === 'Final') {
+          a.warFinal = false;
+          Logger.log(`flushPendingChanges: ${a.datumStr} ${a.gegner} wieder Final → warFinal zurückgesetzt`);
+        }
+      }
+    }
+  }
+
+  const hasAffectedFinals = abwAffected ? abwAffected.some(a => a.warFinal) : false;
+
+  if (logEntries.length === 0 && !hasAffectedFinals) {
     Logger.log('flushPendingChanges: keine Änderungen');
     return;
   }
@@ -603,13 +713,8 @@ function flushPendingChanges(): void {
   const spCount = logEntries.filter(e => e.sheetName === SHEET_NAMES.SPIELER).length;
   Logger.log(`flushPendingChanges: ${logEntries.length} Einträge ` +
     `(Saison: ${saisonMod} mod, ${saisonAdd} neu, ${saisonDel} del, ${skippedAdd} Geplant übersprungen | ` +
-    `Abw: ${abwCount} | Spieler: ${spCount})`);
-
-  let abwAffected: AbwAffectedEntry[] | null = null;
-  if (abwAffectedRaw) {
-    abwAffected = JSON.parse(abwAffectedRaw);
-    if (abwAffected && abwAffected.length === 0) abwAffected = null;
-  }
+    `Abw: ${abwCount} | Spieler: ${spCount})` +
+    (hasAffectedFinals ? ` | Final→Geplant Reverts: ja` : ''));
 
   sendChangeNotification(logEntries, abwAffected, saisonDiffs);
 }
@@ -802,15 +907,31 @@ function diffSaisonRow(oldR: SaisonRowSnapshot, newR: SaisonRowSnapshot): Change
   return changes;
 }
 
+function formatSaisonRowForLog(row: SaisonRowSnapshot): string {
+  const parts: string[] = [];
+  if (row.gegner) parts.push(row.gegner);
+  if (row.startzeit) parts.push(row.startzeit);
+  if (row.heimAuswaerts) parts.push(row.heimAuswaerts);
+  for (let pi = 0; pi < row.playerAssignments.length; pi++) {
+    const v = row.playerAssignments[pi];
+    if (v) parts.push(`${SHEET_CONFIG.spieler[pi].name}: ${v}`);
+  }
+  for (let ei = 0; ei < row.ersatz.length; ei++) {
+    if (row.ersatz[ei]) parts.push(`Ersatz ${ei + 1}: ${row.ersatz[ei]}`);
+  }
+  parts.push(`Status: ${row.status}`);
+  if (row.kommentar) parts.push(`Kommentar: ${row.kommentar}`);
+  return parts.join(' | ');
+}
+
 // ─── Saison-Validierung (Validierungsspalte) ───────────────────────────────────
 
 function computeValidierung(
   playerRow: string[],
   datum: Date,
-  aktiveSpieler: Spieler[],
+  spieler: Spieler[],
   allAbw: Map<string, Map<string, string>>,
-  sheet: GoogleAppsScript.Spreadsheet.Sheet,
-  row: number
+  ersatzVals: string[]
 ): string {
   const key = dateKey(datum);
   const dayMap = allAbw.get(key);
@@ -826,23 +947,22 @@ function computeValidierung(
     else if (val === 'Einzel') einzel++;
     else if (val === 'Doppel') doppel++;
 
-    const name = aktiveSpieler[pi].name;
+    const name = spieler[pi].name;
     const abwDisplay = dayMap?.get(name);
     if (abwDisplay) warnungen.push(`${name}: ${abwDisplay}`);
   }
 
   let ersatz = 0;
-  for (let ei = 0; ei < 3; ei++) {
-    if (String(sheet.getRange(row, saisonErsatzCol(ei)).getValue() || '').trim()) {
-      ersatz++;
-    }
+  for (const e of ersatzVals) {
+    if (String(e || '').trim()) ersatz++;
   }
 
   const f = SHEET_CONFIG.einstellungen.spielformat;
   let missingEinzel = Math.max(0, f.einzel - einzel);
   let missingDoppel = Math.max(0, f.doppel * 2 - doppel);
   for (let i = 0; i < ersatz; i++) {
-    if (missingEinzel > 0) { einzel++; missingEinzel--; }
+    if (missingEinzel > 0 && missingDoppel > 0) { einzel++; doppel++; missingEinzel--; missingDoppel--; }
+    else if (missingEinzel > 0) { einzel++; missingEinzel--; }
     else if (missingDoppel > 0) { doppel++; missingDoppel--; }
     else { einzel++; doppel++; }
   }
@@ -857,15 +977,6 @@ function computeValidierung(
   return warnungen.join(' | ');
 }
 
-function toDateSafe(val: unknown): Date | null {
-  if (val instanceof Date) return val;
-  if (typeof val === 'string' && val) {
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? null : d;
-  }
-  return null;
-}
-
 function validateAndUpdateSaisonRow(editedRange: GoogleAppsScript.Spreadsheet.Range): void {
   const row = editedRange.getRow();
   const sheet = editedRange.getSheet();
@@ -877,15 +988,21 @@ function validateAndUpdateSaisonRow(editedRange: GoogleAppsScript.Spreadsheet.Ra
     return;
   }
 
-  const datum = toDateSafe(sheet.getRange(row, saisonDatumCol()).getValue());
+  const datum = toDate(sheet.getRange(row, saisonDatumCol()).getValue());
   if (!datum) return;
 
-  const aktiveSpieler = readAktiveSpieler(ss.getSheetByName(SHEET_NAMES.SPIELER)!);
-  if (!aktiveSpieler || aktiveSpieler.length === 0) return;
-
   const allAbw = buildAbwesenheitenIndex(ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN)!);
-  const playerRow = sheet.getRange(row, saisonSpielerCol(0), 1, aktiveSpieler.length).getValues()[0] as string[];
-  const validierung = computeValidierung(playerRow, datum, aktiveSpieler, allAbw, sheet, row);
+  const numPlayers = SHEET_CONFIG.spieler.length;
+  const playerRow = sheet.getRange(row, saisonSpielerCol(0), 1, numPlayers).getValues()[0] as string[];
+  const allSpieler: Spieler[] = SHEET_CONFIG.spieler.map(s => ({
+    name: s.name, email: '', rang: s.rang, aenderungenMelden: false, rolle: ''
+  }));
+  const ersatzVals = [
+    String(sheet.getRange(row, saisonErsatzCol(0)).getValue() || ''),
+    String(sheet.getRange(row, saisonErsatzCol(1)).getValue() || ''),
+    String(sheet.getRange(row, saisonErsatzCol(2)).getValue() || ''),
+  ];
+  const validierung = computeValidierung(playerRow, datum, allSpieler, allAbw, ersatzVals);
   sheet.getRange(row, saisonValidierungCol()).setValue(validierung);
 }
 
@@ -916,41 +1033,151 @@ function logChange(entry: ChangeEntry): void {
 // ─── Mail-Benachrichtigung ─────────────────────────────────────────────────
 
 /**
+ * Baut die Ohne-Email-Sektion für den Kapitän.
+ *
+ * Iteriert über saisonDiffs und sammelt alle Spieler ohne hinterlegte
+ * E-Mail-Adresse, deren Aufstellung sich geändert hat. Die Tabelle zeigt
+ * Datum/Gegner, Spielername und die neue Einsatzart (bzw. „-" wenn der
+ * Spieler nicht mehr aufgestellt ist).
+ *
+ * Ist als eigenständige Funktion ohne Abhängigkeit zum Mail-Versand
+ * implementiert, um später problemlos auf eine separate Mail umstellbar zu sein.
+ *
+ * Gibt einen leeren String zurück, wenn keine Ohne-Email-Änderungen vorliegen.
+ */
+function buildOhneEmailSektion(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, saisonDiffs: SaisonDiffResult): string {
+  const ohneEmailNamen = new Set<string>();
+  const spielerSheet = ss.getSheetByName(SHEET_NAMES.SPIELER);
+  if (spielerSheet) {
+    const lr = spielerSheet.getLastRow();
+    const d = spielerSheet.getRange(2, 1, lr - 1, COL_SPIELER.Rolle).getValues();
+    for (const r of d) {
+      const name = String(r[COL_SPIELER.Name - 1] || '').trim();
+      if (!name) continue;
+      const email = String(r[COL_SPIELER.Email - 1]).trim();
+      if (!email || !email.includes('@')) ohneEmailNamen.add(name);
+    }
+  }
+  if (ohneEmailNamen.size === 0) return '';
+
+  interface OhneEmailRow {
+    spieltag: string;
+    spieler: string;
+    einsatz: string;
+  }
+  const rows: OhneEmailRow[] = [];
+  const spieltagKey = (r: SaisonRowSnapshot) => `${r.datum} — ${r.gegner}`;
+
+  const addRow = (r: SaisonRowSnapshot, name: string, einsatz: string) => {
+    if (ohneEmailNamen.has(name)) {
+      rows.push({ spieltag: spieltagKey(r), spieler: name, einsatz });
+    }
+  };
+
+  for (const mod of saisonDiffs.modified) {
+    for (let pi = 0; pi < SHEET_CONFIG.spieler.length; pi++) {
+      const ov = mod.oldRow.playerAssignments[pi];
+      const nv = mod.newRow.playerAssignments[pi];
+      if (ov === nv) continue;
+      const name = SHEET_CONFIG.spieler[pi].name;
+      if (nv && !nv.startsWith('✗')) {
+        addRow(mod.newRow, name, nv);
+      } else {
+        addRow(mod.oldRow, name, '-');
+      }
+    }
+  }
+  for (const a of saisonDiffs.added) {
+    for (let pi = 0; pi < SHEET_CONFIG.spieler.length; pi++) {
+      const nv = a.playerAssignments[pi];
+      if (nv && !nv.startsWith('✗')) {
+        addRow(a, SHEET_CONFIG.spieler[pi].name, nv);
+      }
+    }
+  }
+  for (const d of saisonDiffs.deleted) {
+    for (let pi = 0; pi < SHEET_CONFIG.spieler.length; pi++) {
+      const ov = d.playerAssignments[pi];
+      if (ov && !ov.startsWith('✗')) {
+        addRow(d, SHEET_CONFIG.spieler[pi].name, '-');
+      }
+    }
+  }
+
+  if (rows.length === 0) return '';
+
+  const sortKey = (d: string) => {
+    const p = d.split('.');
+    return p.length === 3 ? p[2] + p[1] + p[0] : d;
+  };
+  rows.sort((a, b) => sortKey(a.spieltag.split(' — ')[0]).localeCompare(sortKey(b.spieltag.split(' — ')[0])));
+
+  const s = emailStyles();
+  let html = '<p style="margin-top:20px"><b>Ohne E-Mail-Adresse:</b><br>Folgende Spieler konnten nicht per E-Mail informiert werden:</p>';
+  html += '<table border="1" cellpadding="4" cellspacing="0" style="font-size:13px;border-collapse:collapse">';
+  html += '<tr style="background:#4A90D9;color:white"><th>Spieltag</th><th>Spieler</th><th>Einsatz</th></tr>';
+  for (const r of rows) {
+    html += `<tr><td style="padding:2px 6px">${escapeHtml(r.spieltag)}</td><td style="padding:2px 6px">${escapeHtml(r.spieler)}</td><td style="padding:2px 6px">${escapeHtml(r.einsatz)}</td></tr>`;
+  }
+  html += '</table>';
+
+  return html;
+}
+
+/**
  * Baut eine HTML-Änderungsmail und verschickt sie an alle Empfänger.
  *
- * Empfänger-Kreis:
+ * Empfänger-Kreis (in getAenderungenMeldenEmpfaenger):
  *   - Kapitän (Rolle "Kapitän") immer – unabhängig von der Checkbox
+ *   - Spieler, deren eigener Einsatz geändert wurde (auch durch
+ *     Abwesenheits-Revert Final→Geplant) – unabhängig von der Checkbox
  *   - Alle Spieler mit gesetzter Checkbox "Aufstellungsänderungen melden"
- *     (außer dem Bearbeiter selbst, um Selbstbenachrichtigungen zu vermeiden)
+ *   - Ausnahme: der Bearbeiter selbst wird nicht benachrichtigt
  *
  * Darstellung:
- *   - Saison-Änderungen nach Spieltag gruppiert mit Zeilenkontext (Gegner, Datum, Ort)
- *   - Abwesenheits-Änderungen nur wenn ABW_AFFECTED Spieltage listet,
- *     dann angereichert mit Spieltag-Kontext und warAufgestellt/warFinal
- *   - Spieler- und sonstige Änderungen in einer separaten Tabelle
+ *   - Saison-Änderungen nach Spieltag gruppiert mit Zeilenkontext
+ *     (Gegner, Datum, Ort)
+ *   - Abwesenheits-Änderungen mit Spieltags-Bezug, angereichert
+ *     mit warAufgestellt/warFinal-Kontext („Final → Geplant“-Hinweis)
+ *
+ * Die Mail wird auch dann gesendet, wenn nur ein Abwesenheits-Revert
+ * (Final→Geplant) vorliegt, aber keine Snapshot-Diff-Einträge – etwa
+ * beim ersten Edit oder wenn nur der Status revertiert wurde.
  */
 function sendChangeNotification(
   entries: ChangeEntry[],
   abwAffected: AbwAffectedEntry[] | null,
   saisonDiffs: SaisonDiffResult | null
 ): void {
-  // Finalisierungs-Flag: nach "Finalisieren + Emails senden" keine redundante Änderungsmail
   const props = PropertiesService.getScriptProperties();
-  if (props.getProperty('SUPPRESS_NOTIFICATION') === 'true') {
+  const suppress = props.getProperty('SUPPRESS_NOTIFICATION') === 'true';
+
+  // SUPPRESS_NOTIFICATION: Nach "Finalisieren + Senden" keine redundante
+  // Änderungsmail. Ohne-Email-Info wird bereits synchron in
+  // menuFinalisierenUndSenden per sendOhneEmailFinalMail versendet.
+  if (suppress) {
+    Logger.log('sendChangeNotification: SUPPRESS_NOTIFICATION → unterdrückt');
     props.deleteProperty('SUPPRESS_NOTIFICATION');
     return;
   }
 
-  // Nur relevant wenn sichtbare Saison- oder Abw-Änderungen vorliegen
+  // Nur relevant wenn sichtbare Saison- oder Abw-Änderungen vorliegen.
+  // Zusätzlich: Mail auch senden, wenn ein Abwesenheits-Revert (Final→Geplant)
+  // stattfand, selbst wenn der Saison-Diff oder Abw-Snapshot-Diff leer ist.
   const visibleAdded = saisonDiffs ? saisonDiffs.added.filter(a => a.status === 'Final').length : 0;
   const visibleSaisonCount = (saisonDiffs?.modified.length ?? 0) + visibleAdded + (saisonDiffs?.deleted.length ?? 0);
   const showAbw = abwAffected && abwAffected.length > 0;
   const abwEntries = showAbw ? entries.filter(e => e.sheetName === SHEET_NAMES.ABWESENHEITEN) : [];
-  if (visibleSaisonCount === 0 && abwEntries.length === 0) return;
+  const hasAffectedFinals = abwAffected ? abwAffected.some(a => a.warFinal) : false;
+  Logger.log(`sendChangeNotification: Saison=${visibleSaisonCount} | AbwEntries=${abwEntries.length} | AbwAffected=${abwAffected?.length ?? 0} | hasAffectedFinals=${hasAffectedFinals}`);
+  if (visibleSaisonCount === 0 && abwEntries.length === 0 && !hasAffectedFinals) {
+    Logger.log('sendChangeNotification: keine sichtbaren Änderungen → return');
+    return;
+  }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Betroffene Spieler aus dem Saison-Diff ermitteln
+  // Betroffene Spieler aus dem Saison-Diff und aus Abwesenheits-Reverts ermitteln
   const affectedNames = new Set<string>();
   if (saisonDiffs) {
     for (const mod of saisonDiffs.modified) {
@@ -975,9 +1202,24 @@ function sendChangeNotification(
       for (const n of d.ersatz) { if (n) affectedNames.add(n); }
     }
   }
+  // Zusätzlich: Spieler, deren Abwesenheit einen Status-Revert (Final→Geplant)
+  // ausgelöst hat, unabhängig davon ob der Saison-Diff die Änderung erfasst hat.
+  if (abwAffected) {
+    for (const a of abwAffected) {
+      if (a.warAufgestellt) {
+        affectedNames.add(a.spielerName);
+      }
+    }
+  }
+
+  Logger.log(`sendChangeNotification: affectedNames=[${[...affectedNames].join(', ')}]`);
 
   const empfaenger = getAenderungenMeldenEmpfaenger(ss, affectedNames);
-  if (empfaenger.length === 0) return;
+  Logger.log(`sendChangeNotification: ${empfaenger.length} Empfänger — [${empfaenger.join(', ')}]`);
+  if (empfaenger.length === 0) {
+    Logger.log('sendChangeNotification: keine Empfänger → return');
+    return;
+  }
 
   const subject = `Einsatzplaner – Änderungen vom ${Utilities.formatDate(new Date(), 'Europe/Berlin', 'dd.MM.yyyy HH:mm')}`;
   const s = emailStyles();
@@ -1011,7 +1253,9 @@ function sendChangeNotification(
   }
 
   // ── Abwesenheits-Änderungen ──
-  if (showAbw && abwEntries.length > 0) {
+  // Abwesenheits-sektion anzeigen wenn es entweder Snapshot-Diff-Einträge gibt
+  // oder ein Status-Revert (Final→Geplant) durch eine Abwesenheit ausgelöst wurde.
+  if (showAbw && (abwEntries.length > 0 || abwAffected!.some(a => a.warFinal))) {
     if (visibleSaisonCount > 0) html += `<p style="margin-top:20px">Abwesenheits-Änderungen mit Spieltags-Bezug:</p>`;
     else html += `<p>Abwesenheits-Änderungen mit Spieltags-Bezug:</p>`;
 
@@ -1023,19 +1267,41 @@ function sendChangeNotification(
 
     for (const a of abwAffected!) {
       const context = [a.datumStr, a.startzeit, a.heimAuswaerts, a.gegner ? `— ${a.gegner}` : ''].filter(Boolean).join(' ');
-      const status = a.warAufgestellt
-        ? (a.warFinal ? 'War aufgestellt (Final → Geplant) — Nachplanung nötig!' : 'War aufgestellt — Nachplanung nötig!')
-        : 'Stand als Ersatz zur Verfügung';
+      let status: string;
+      if (a.warAufgestellt) {
+        if (a.warFinal) {
+          // Status ist immer noch Geplant (wurde nicht korrigiert)
+          if (a.validierung) {
+            status = `War aufgestellt (Final → Geplant). Validierung: ${a.validierung}`;
+          } else {
+            status = 'War aufgestellt (Final → Geplant) — Bitte Spieltag prüfen und Status auf Final setzen.';
+          }
+        } else {
+          // Tag wurde korrigiert oder war nie Final
+          status = 'War aufgestellt.';
+        }
+      } else {
+        status = 'Stand als Ersatz zur Verfügung';
+      }
       html += `<p style="margin:2px 0 2px 20px;font-size:13px">${escapeHtml(context)}<br><span style="${s.red}">${escapeHtml(a.spielerName)}: ${status}</span></p>`;
     }
   }
 
-  html += `<p style="${s.footer}">Viele Grüße,<br>Dein Einsatzplaner-Team</p></body></html>`;
+  // ── Ohne-Email-Sektion (nur für den Kapitän) ──
+  const kapEmail = getKapitaenEmail(ss);
+  const ohneHtml = saisonDiffs ? buildOhneEmailSektion(ss, saisonDiffs) : '';
+
+  const footerHtml = `<p style="${s.footer}">Viele Grüße,<br>Dein Einsatzplaner-Team</p></body></html>`;
 
   for (const email of empfaenger) {
-    MailApp.sendEmail({ to: email, subject, htmlBody: html });
+    const isKapitaen = email === kapEmail;
+    const body = isKapitaen && ohneHtml
+      ? html + ohneHtml + footerHtml
+      : html + footerHtml;
+    MailApp.sendEmail({ to: email, subject, htmlBody: body });
   }
-  Logger.log(`sendChangeNotification: Mail an ${empfaenger.length} Empfänger (${empfaenger.join(', ')})`);
+  Logger.log(`sendChangeNotification: Mail an ${empfaenger.length} Empfänger (${empfaenger.join(', ')})` +
+    (ohneHtml ? ' — mit Ohne-Email-Sektion für Kapitän' : ''));
 }
 
 // ─── Saison-Tabellen-Builder für die Mail ───────────────────────────────────
@@ -1143,7 +1409,9 @@ function escapeHtml(s: string): string {
  *
  * Optional (wenn Checkbox gesetzt):
  *   - Alle Spieler mit "Aufstellungsänderungen melden" = TRUE
- *   - Ausnahme: der aktuelle Bearbeiter selbst wird nicht benachrichtigt
+ *
+ * Der aktuelle Bearbeiter wird von der eigenen Benachrichtigung
+ * ausgeschlossen (gilt auch für den Kapitän).
  */
 function getAenderungenMeldenEmpfaenger(
   ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
@@ -1158,20 +1426,39 @@ function getAenderungenMeldenEmpfaenger(
   const currentUser = Session.getActiveUser().getEmail();
   const data = spielerSheet.getRange(2, 1, lastRow - 1, COL_SPIELER.Rolle).getValues();
   const empfaenger: string[] = [];
+  let skippedNoEmail = 0;
+  let skippedSelfEdit = 0;
 
   for (const row of data) {
+    const name = String(row[COL_SPIELER.Name - 1] || '').trim();
+    if (!name) continue; // Leere Zeilen (kein Spieler eingetragen) überspringen
+
     const email = String(row[COL_SPIELER.Email - 1]).trim();
-    if (!email || !email.includes('@') || email === currentUser) continue;
+    if (!email || !email.includes('@')) { skippedNoEmail++; continue; }
+    if (email === currentUser) { skippedSelfEdit++; continue; }
 
     const rolle = String(row[COL_SPIELER.Rolle - 1] || '').trim();
-    const melden = row[COL_SPIELER.AenderungenMelden - 1] === true
-      || row[COL_SPIELER.AenderungenMelden - 1] === 'TRUE';
-    const name = String(row[COL_SPIELER.Name - 1] || '').trim();
+    const isKapitaen = rolle === 'Kapitän';
 
-    // Kapitän immer, betroffene Spieler immer, andere nur mit Checkbox
-    if (rolle === 'Kapitän' || affectedNames.has(name) || melden) {
+    const meldenRaw = row[COL_SPIELER.AenderungenMelden - 1];
+    const melden = meldenRaw === true
+      || String(meldenRaw).toUpperCase() === 'TRUE'
+      || meldenRaw === 1;
+
+    const isAffected = affectedNames.has(name);
+
+    if (isKapitaen || isAffected || melden) {
+      const reason = isKapitaen ? 'Kapitän' : isAffected ? 'betroffen' : 'melden';
+      Logger.log(`  include ${name} <${email}> — ${reason}`);
       if (!empfaenger.includes(email)) empfaenger.push(email);
     }
+  }
+
+  if (skippedNoEmail > 0 || skippedSelfEdit > 0) {
+    Logger.log(`getAenderungenMeldenEmpfaenger: ${empfaenger.length} Empfänger` +
+      ` (${skippedNoEmail} ohne Email, ${skippedSelfEdit} Selbst-Edit übersprungen)`);
+  } else {
+    Logger.log(`getAenderungenMeldenEmpfaenger: ${empfaenger.length} Empfänger`);
   }
   return empfaenger;
 }
