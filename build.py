@@ -2,8 +2,10 @@
 """Baut dist/Config.js aus den Datendateien im angegebenen data-Verzeichnis."""
 
 import argparse
+import base64
 import csv
 import json
+import mimetypes
 import os
 from datetime import date, datetime
 
@@ -87,8 +89,13 @@ def read_einstellungen(data_dir: str) -> dict:
         return json.load(f)
 
 
-def generate_js(spieler, abwesenheiten, einstellungen) -> str:
+def generate_js(spieler, abwesenheiten, einstellungen, logo_base64: str) -> str:
     lines = ["// GENERIERT von build.py – nicht manuell bearbeiten.", ""]
+    if logo_base64:
+        lines.append(f'const LOGO_BASE64 = "{logo_base64}";')
+    else:
+        lines.append('const LOGO_BASE64 = "";')
+    lines.append("")
     lines.append("var SHEET_CONFIG = {")
 
     lines.append("  einstellungen: {")
@@ -148,8 +155,17 @@ def main():
     print("  Lese einstellungen.json ...")
     einstellungen = read_einstellungen(data_dir)
 
+    logo_base64 = ""
+    logo_path = os.path.join(data_dir, "logo.png")
+    if os.path.exists(logo_path):
+        print(f"  Lese logo.png ...")
+        mime, _ = mimetypes.guess_type(logo_path)
+        with open(logo_path, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode()
+        logo_base64 = f"data:{mime or 'image/png'};base64,{encoded}"
+
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-    content = generate_js(spieler, abwesenheiten, einstellungen)
+    content = generate_js(spieler, abwesenheiten, einstellungen, logo_base64)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write(content)
 

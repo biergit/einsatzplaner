@@ -71,4 +71,8 @@ describe('generated Config.js', () => {
   it('contains spieltage config', () => {
     expect(content).toContain('spieltage: [6]');
   });
+
+  it('declares LOGO_BASE64', () => {
+    expect(content).toContain('const LOGO_BASE64 = "";');
+  });
 });

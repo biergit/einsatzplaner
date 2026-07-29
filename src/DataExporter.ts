@@ -14,8 +14,9 @@ function exportAllData(): void {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const timestamp = Utilities.formatDate(new Date(), 'Europe/Berlin', 'dd.MM.yyyy HH:mm');
   const s = emailStyles();
+  const logo = getEmailLogo();
 
-  let html = emailHeader();
+  let html = emailHeader() + (logo ? logo.html : '');
   html += `<p>Hallo,</p><p>hier der Datenexport vom ${timestamp}.</p>`;
 
   html += buildSpielerSection(ss, s);
@@ -31,6 +32,7 @@ TSV-Block (für Copy & Paste in eine .tsv-Datei). Einstellungen liegen als JSON 
     to: userEmail,
     subject: `Einsatzplaner – Datenexport ${timestamp}`,
     htmlBody: html,
+    ...(logo && { inlineImages: logo.inlineImages }),
   });
 }
 

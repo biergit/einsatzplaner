@@ -218,6 +218,20 @@ function emailFooter(): string {
 </body></html>`;
 }
 
+/** Erzeugt Logo-HTML und das inlineImages-Objekt für MailApp.sendEmail.
+ * Gibt null zurück wenn kein Logo konfiguriert ist. */
+function getEmailLogo(): { html: string; inlineImages: Record<string, GoogleAppsScript.Base.BlobSource> } | null {
+  if (!LOGO_BASE64) return null;
+  const parts = LOGO_BASE64.split(',');
+  if (parts.length < 2) return null;
+  const mime = parts[0].split(':')[1]?.split(';')[0] || 'image/png';
+  const blob = Utilities.newBlob(Utilities.base64Decode(parts[1]), mime, 'logo');
+  return {
+    html: '<img src="cid:logo" style="height:60px;width:auto;margin-bottom:15px"><br>',
+    inlineImages: { logo: blob },
+  };
+}
+
 function readSpielerNames(ss: GoogleAppsScript.Spreadsheet.Spreadsheet): string[] {
   const s = ss.getSheetByName(SHEET_NAMES.SPIELER);
   if (!s) return [];
@@ -263,7 +277,8 @@ function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], spielp
 
   const kmtHead = hasKommentar ? '<th>Kommentar</th>' : '';
 
-  const html = emailHeader() + `
+  const logo = getEmailLogo();
+  const html = emailHeader() + (logo ? logo.html : '') + `
 <p>Hallo ${spieler.name},</p>
 <p>hier ist dein persönlicher</p>
 <h1>EINSATZPLAN</h1>
@@ -281,5 +296,6 @@ ${emailFooter()}`;
     to: spieler.email,
     subject: `Neuer ${SHEET_CONFIG.einstellungen.teamName} - Einsatzplan`,
     htmlBody: html,
+    ...(logo && { inlineImages: logo.inlineImages }),
   });
 }

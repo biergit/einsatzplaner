@@ -1243,7 +1243,8 @@ function sendChangeNotification(
 
   const subject = `Einsatzplaner – Änderungen vom ${Utilities.formatDate(new Date(), 'Europe/Berlin', 'dd.MM.yyyy HH:mm')}`;
   const s = emailStyles();
-  let html = emailHeader() + `
+  const logo = getEmailLogo();
+  let html = emailHeader() + (logo ? logo.html : '') + `
 <p>Hallo,</p>`;
 
   if (visibleSaisonCount > 0 && saisonDiffs) {
@@ -1318,7 +1319,12 @@ function sendChangeNotification(
     const body = isKapitaen && ohneHtml
       ? html + ohneHtml + footer
       : html + footer;
-    MailApp.sendEmail({ to: email, subject, htmlBody: body });
+    MailApp.sendEmail({
+      to: email,
+      subject,
+      htmlBody: body,
+      ...(logo && { inlineImages: logo.inlineImages }),
+    });
   }
   Logger.log(`sendChangeNotification: Mail an ${empfaenger.length} Empfänger (${empfaenger.join(', ')})` +
     (ohneHtml ? ' — mit Ohne-Email-Sektion für Kapitän' : ''));

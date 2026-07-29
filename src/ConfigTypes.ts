@@ -1,3 +1,5 @@
+declare const LOGO_BASE64: string;
+
 enum COL_SPIELER {
   Name = 1,
   Email = 2,
