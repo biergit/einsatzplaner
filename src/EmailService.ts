@@ -156,7 +156,8 @@ function buildOhneEmailTabelle(ohneEmail: { name: string; einsaetze: EinsatzInfo
     return p.length === 3 ? p[2] + p[1] + p[0] : d;
   };
 
-  let html = '<p style="margin-top:20px"><b>Ohne E-Mail-Adresse:</b><br>Folgende Spieler konnten nicht per E-Mail informiert werden:</p>';
+  let html = '<h1>Betroffene - nicht per E-Mail benachrichtigte Spieler</h1>';
+    html += 'Folgende Spieler konnten nicht per E-Mail informiert werden, da keine E-Mail-Adresse hinterlegt war:'
 
   for (const { name, einsaetze } of ohneEmail) {
     const sorted = [...einsaetze].sort((a, b) => sortKey(a.datum).localeCompare(sortKey(b.datum)));
@@ -166,7 +167,7 @@ function buildOhneEmailTabelle(ohneEmail: { name: string; einsaetze: EinsatzInfo
       rows += `<tr><td style="padding:2px 6px">${escapeHtml(e.datum)} — ${escapeHtml(e.gegner)}</td><td style="padding:2px 6px">${escapeHtml(e.einsatzart)}</td></tr>`;
     }
 
-    html += `<p style="margin-bottom:2px;font-weight:bold">${escapeHtml(name)}</p>
+    html += `<h2>${escapeHtml(name)}</h2>
 <table border="1" cellpadding="4" cellspacing="0" style="font-size:13px;border-collapse:collapse;margin-bottom:12px">
 <tr style="background:#4A90D9;color:white"><th>Spieltag</th><th>Einsatz</th></tr>
 ${rows}
@@ -254,13 +255,13 @@ function sendEinsatzplanEmail(spieler: Spieler, einsaetze: EinsatzInfo[], spielp
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:14px">
 <p>Hallo ${spieler.name},</p>
 <p>hier ist dein persönlicher</p>
-<p><b>EINSATZPLAN<b></p>
+<h1>EINSATZPLAN</h1>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px">
 <tr style="background:#4A90D9;color:white"><th>Datum / Zeit</th><th>Ort</th><th>Gegner</th><th>Einsatzart</th>${kmtHead}</tr>
 ${personliche}
 </table>
 <p>und der</p>
-<p><b>GESAMTSPIELPLAN</b></p>
+<h1>GESAMTSPIELPLAN</h1>
 ${htmlTable}
 ${ohneHtml}
 <p>Viele Grüße,<br>Dein Einsatzplaner-Team</p>
