@@ -1,10 +1,11 @@
 {
+  "sheetTitel": "TT Team Test",
   "teamName": "TT Team Test",
   "saison": "2026/2027",
   "saisonBeginn": "2026-09-01",
   "saisonEnde": "2026-12-31",
   "debounceMinuten": 1,
-  "spieltage": [6],
+  "spieltage": [2,3,5],
   "spielformat": {
     "einzel": 4,
     "doppel": 2,

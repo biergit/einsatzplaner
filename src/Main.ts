@@ -31,6 +31,7 @@ function menuSheetNeuAufbauen(): void {
     props.setProperty('SHEET_BUILDER_RUNNING', 'true');
     props.deleteProperty('SUPPRESS_NOTIFICATION');
     buildAllSheets(SHEET_CONFIG);
+    SpreadsheetApp.getActiveSpreadsheet().rename(SHEET_CONFIG.einstellungen.sheetTitel);
     saveSheetSnapshots(SpreadsheetApp.getActiveSpreadsheet());
     props.setProperty('SHEET_BUILDER_RUNNING', 'false');
     ui.alert('Fertig', 'Das Sheet wurde erfolgreich neu aufgebaut.', ui.ButtonSet.OK);

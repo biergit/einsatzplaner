@@ -79,6 +79,7 @@ type AufstellungsTyp = 'Einzel+Doppel' | 'Einzel' | 'Doppel';
 const ALLE_AUFSTELLUNGS_TYPEN: AufstellungsTyp[] = ['Einzel+Doppel', 'Einzel', 'Doppel'];
 
 interface Einstellungen {
+  sheetTitel: string;
   teamName: string;
   saison: string;
   saisonBeginn: Date;

@@ -35,6 +35,7 @@ describe('generated Config.js', () => {
   });
 
   it('contains team and saison', () => {
+    expect(content).toContain("sheetTitel: 'TT Team Test'");
     expect(content).toContain("teamName: 'TT Team Test'");
     expect(content).toContain("saisonBeginn: new Date('2026-09-01')");
     expect(content).toContain("saisonEnde: new Date('2026-12-31')");
@@ -69,7 +70,7 @@ describe('generated Config.js', () => {
   });
 
   it('contains spieltage config', () => {
-    expect(content).toContain('spieltage: [6]');
+    expect(content).toContain('spieltage: [2, 3, 5]');
   });
 
   it('declares LOGO_BASE64', () => {

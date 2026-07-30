@@ -77,6 +77,7 @@ def read_einstellungen(data_dir: str) -> dict:
     if not os.path.exists(path):
         print(f"  [skip] {path} nicht gefunden, verwende defaults")
         return {
+            "sheetTitel": "TT Einsatzplaner",
             "teamName": "TT Team",
             "saison": "2026/2027",
             "saisonBeginn": "2026-09-01",
@@ -99,6 +100,8 @@ def generate_js(spieler, abwesenheiten, einstellungen, logo_base64: str) -> str:
     lines.append("var SHEET_CONFIG = {")
 
     lines.append("  einstellungen: {")
+    sheet_titel = einstellungen.get("sheetTitel", einstellungen["teamName"])
+    lines.append(f"    sheetTitel: '{sheet_titel}',")
     lines.append(f"    teamName: '{einstellungen['teamName']}',")
     lines.append(f"    saison: '{einstellungen['saison']}',")
     lines.append(f"    saisonBeginn: new Date('{einstellungen['saisonBeginn']}'),")

@@ -2,6 +2,7 @@
 
 const SHEET_CONFIG: SheetConfig = {
   einstellungen: {
+    sheetTitel: 'TT Einsatzplaner',
     teamName: 'TT Team',
     saison: '2026/2027',
     saisonBeginn: new Date('2026-09-01'),
