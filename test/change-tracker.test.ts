@@ -1069,3 +1069,131 @@ describe('buildOhneEmailHtml grouping & sorting', () => {
     expect(abcIdx).toBeLessThan(defIdx);
   });
 });
+
+// ─── getPlayersWithAssignments (Saison-Zeilen → Spieler mit Aufstellung) ─────
+
+function getPlayersWithAssignments(saisonRows: SaisonRowSnapshot[], playerNames: string[]): Set<string> {
+  const result = new Set<string>();
+  for (const r of saisonRows) {
+    if (r.status !== 'Final' && r.status !== 'Geplant') continue;
+    for (let pi = 0; pi < playerNames.length; pi++) {
+      const v = r.playerAssignments[pi];
+      if (v && !v.startsWith('✗')) result.add(playerNames[pi]);
+    }
+    for (const e of r.ersatz) {
+      if (e) result.add(e);
+    }
+  }
+  return result;
+}
+
+describe('getPlayersWithAssignments', () => {
+  const players = ['Max', 'Anna', 'Tom'];
+
+  it('empty saison rows → empty set', () => {
+    expect(getPlayersWithAssignments([], players).size).toBe(0);
+  });
+
+  it('row with non-Final/Geplant status → ignored', () => {
+    const rows = [sRow('01.09.2026', 'ABC', {
+      status: 'Pausiert',
+      playerAssignments: ['Einzel+Doppel', '', ''],
+    })];
+    expect(getPlayersWithAssignments(rows, players).size).toBe(0);
+  });
+
+  it('Final row with player assignment → collected', () => {
+    const rows = [sRow('01.09.2026', 'ABC', {
+      status: 'Final',
+      playerAssignments: ['Einzel+Doppel', 'Doppel', ''],
+    })];
+    const result = getPlayersWithAssignments(rows, players);
+    expect(result.has('Max')).toBe(true);
+    expect(result.has('Anna')).toBe(true);
+    expect(result.has('Tom')).toBe(false);
+  });
+
+  it('Geplant row → collected', () => {
+    const rows = [sRow('01.09.2026', 'ABC', {
+      status: 'Geplant',
+      playerAssignments: ['', 'Einzel', ''],
+    })];
+    const result = getPlayersWithAssignments(rows, players);
+    expect(result.has('Anna')).toBe(true);
+  });
+
+  it('✗ prefix → excluded', () => {
+    const rows = [sRow('01.09.2026', 'ABC', {
+      status: 'Final',
+      playerAssignments: ['✗ Urlaub', '', ''],
+    })];
+    expect(getPlayersWithAssignments(rows, players).has('Max')).toBe(false);
+  });
+
+  it('Ersatz players → collected', () => {
+    const rows = [sRow('01.09.2026', 'ABC', {
+      status: 'Final',
+      playerAssignments: ['', '', ''],
+      ersatz: ['Gast1', 'Gast2', ''],
+    })];
+    const result = getPlayersWithAssignments(rows, players);
+    expect(result.has('Gast1')).toBe(true);
+    expect(result.has('Gast2')).toBe(true);
+  });
+
+  it('multiple rows → union of all players', () => {
+    const rows = [
+      sRow('01.09.2026', 'ABC', { status: 'Final', playerAssignments: ['Einzel', '', ''] }),
+      sRow('15.09.2026', 'DEF', { status: 'Geplant', playerAssignments: ['', 'Doppel', ''] }),
+    ];
+    const result = getPlayersWithAssignments(rows, players);
+    expect(result.has('Max')).toBe(true);
+    expect(result.has('Anna')).toBe(true);
+    expect(result.size).toBe(2);
+  });
+});
+
+// ─── Empfänger-Inclusion mit hasAnyAssignment-Filter ─────────────────────────
+
+describe('Empfänger inclusion with assignment filter', () => {
+  /** Repliziert die aktualisierte inclusion-Logik. */
+  function shouldInclude(
+    isKapitaen: boolean,
+    isAffected: boolean,
+    melden: boolean,
+    hasAssignment: boolean,
+    isEditor: boolean,
+  ): boolean {
+    if (isEditor) return false;
+    if (isKapitaen) return true;
+    if (isAffected) return true;
+    // Checkbox-Empfänger nur benachrichtigen wenn sie mindestens eine Aufstellung haben
+    if (melden && hasAssignment) return true;
+    return false;
+  }
+
+  it('checkbox + hasAssignment → included', () => {
+    expect(shouldInclude(false, false, true, true, false)).toBe(true);
+  });
+
+  it('checkbox + no assignment → excluded', () => {
+    expect(shouldInclude(false, false, true, false, false)).toBe(false);
+  });
+
+  it('checkbox + no assignment + editor → excluded', () => {
+    expect(shouldInclude(false, false, true, false, true)).toBe(false);
+  });
+
+  it('affected + no assignment → included (wurde aus letzter Aufstellung entfernt)', () => {
+    expect(shouldInclude(false, true, false, false, false)).toBe(true);
+  });
+
+  it('Kapitän + no assignment → included', () => {
+    expect(shouldInclude(true, false, false, false, false)).toBe(true);
+  });
+
+  it('kein Grund → excluded regardless of assignment', () => {
+    expect(shouldInclude(false, false, false, true, false)).toBe(false);
+    expect(shouldInclude(false, false, false, false, false)).toBe(false);
+  });
+});

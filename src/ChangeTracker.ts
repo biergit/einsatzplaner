@@ -1426,6 +1426,24 @@ function escapeHtml(s: string): string {
 
 // ─── Empfänger-Ermittlung ──────────────────────────────────────────────────
 
+/** Sammelt alle Spielernamen, die in mindestens einer Saison-Zeile
+ * (Final oder Geplant) eine nicht-leere, nicht-✗-Einsatzart haben.
+ * Rein funktional → testbar. */
+function getPlayersWithAssignments(saisonRows: SaisonRowSnapshot[], playerNames: string[]): Set<string> {
+  const result = new Set<string>();
+  for (const r of saisonRows) {
+    if (r.status !== 'Final' && r.status !== 'Geplant') continue;
+    for (let pi = 0; pi < playerNames.length; pi++) {
+      const v = r.playerAssignments[pi];
+      if (v && !v.startsWith('✗')) result.add(playerNames[pi]);
+    }
+    for (const e of r.ersatz) {
+      if (e) result.add(e);
+    }
+  }
+  return result;
+}
+
 /**
  * Sammelt E-Mail-Adressen der Benachrichtigungs-Empfänger.
  *
@@ -1449,6 +1467,11 @@ function getAenderungenMeldenEmpfaenger(
   const lastRow = spielerSheet.getLastRow();
   if (lastRow <= 1) return [];
 
+  const playersWithAssignments = getPlayersWithAssignments(
+    readSaisonSnapshot(ss.getSheetByName(SHEET_NAMES.SAISON)),
+    SHEET_CONFIG.spieler.map(s => s.name)
+  );
+
   const currentUser = Session.getActiveUser().getEmail();
   const data = spielerSheet.getRange(2, 1, lastRow - 1, COL_SPIELER.Rolle).getValues();
   const empfaenger: string[] = [];
@@ -1457,7 +1480,7 @@ function getAenderungenMeldenEmpfaenger(
 
   for (const row of data) {
     const name = String(row[COL_SPIELER.Name - 1] || '').trim();
-    if (!name) continue; // Leere Zeilen (kein Spieler eingetragen) überspringen
+    if (!name) continue;
 
     const email = String(row[COL_SPIELER.Email - 1]).trim();
     if (!email || !email.includes('@')) { skippedNoEmail++; continue; }
@@ -1473,7 +1496,11 @@ function getAenderungenMeldenEmpfaenger(
 
     const isAffected = affectedNames.has(name);
 
-    if (isKapitaen || isAffected || melden) {
+    // Checkbox-Empfänger nur benachrichtigen wenn sie mindestens
+    // eine Aufstellung im Saison-Sheet haben (oder selbst betroffen sind).
+    const includeMelden = melden && playersWithAssignments.has(name);
+
+    if (isKapitaen || isAffected || includeMelden) {
       const reason = isKapitaen ? 'Kapitän' : isAffected ? 'betroffen' : 'melden';
       Logger.log(`  include ${name} <${email}> — ${reason}`);
       if (!empfaenger.includes(email)) empfaenger.push(email);
