@@ -32,16 +32,16 @@ def read_spieler(data_dir: str) -> list[dict]:
         reader = csv.DictReader(f, delimiter="\t")
         result = []
         for row in reader:
-            name = row["Name"].strip()
+            name = (row.get("Name") or "").strip()
             if not name:
                 continue
-            melden_raw = row.get("Änderungen melden", "").strip().lower()
+            melden_raw = (row.get("Änderungen melden") or "").strip().lower()
             melden = melden_raw in ("ja", "true", "1", "x")
-            rolle = row.get("Rolle", "").strip()
+            rolle = (row.get("Rolle") or "").strip()
             result.append({
                 "name": name,
-                "email": row.get("Email", "").strip(),
-                "rang": int(row.get("Rang", "99") or 99),
+                "email": (row.get("Email") or "").strip(),
+                "rang": int(row.get("Rang") or 99),
                 "aenderungenMelden": "true" if melden else "false",
                 "rolle": rolle if rolle == "Kapitän" else "",
             })
@@ -57,12 +57,12 @@ def read_abwesenheiten(data_dir: str) -> list[dict]:
         reader = csv.DictReader(f, delimiter="\t")
         result = []
         for row in reader:
-            name = row.get("Spieler/in", "").strip()
+            name = (row.get("Spieler/in") or "").strip()
             if not name:
                 continue
             von = parse_date(row["Abwesenheit von"])
             bis = parse_date(row["Abwesenheit bis"])
-            kommentar = row.get("Kommentar", "").strip()
+            kommentar = (row.get("Kommentar") or "").strip()
             result.append({
                 "name": name,
                 "von": von,
