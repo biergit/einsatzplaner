@@ -58,8 +58,8 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
 
     ['', '', ''],
     ['MENÜ', '', ''],
-    ['Sheet neu aufbauen', 'Alles löschen und neu bauen', 'Keine E-Mails'],
-    ['Daten exportieren', 'Exportiert alle Rohdaten als TSV/JSON per E-Mail-Anhang', ''],
+    ['Danger Zone → Sheet neu aufbauen', 'Alles löschen und neu bauen', 'Keine E-Mails'],
+    ['Daten exportieren', 'Exportiert alle Rohdaten als TSV/JSON per E-Mail', ''],
     ['Aufstellungen generieren', 'Leere Zellen nach Rang + Verfügbarkeit füllen', 'Nicht-Stammspieler (gelb) = Rang > 4 oder Ersatzspieler'],
     ['Finalisieren + Emails senden', 'Geplant→Final, HTML-Mails an Spieler + Gesamtspielplan', ''],
     ['', '', ''],

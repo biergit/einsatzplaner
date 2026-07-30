@@ -119,7 +119,7 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 - Neue, nur geplante (nicht finalisierte) Spieltage lösen keine Benachrichtigung aus
 - Der Bearbeiter wird anhand seiner Google-Account-E-Mail identifiziert
 - Änderungen am Dokumentation- und Änderungslog-Sheet lösen keine Benachrichtigung aus
-- Der Neuaufbau des Sheets (Menü → Sheet neu aufbauen) löst keine Benachrichtigungen aus
+- Der Neuaufbau des Sheets (Menü → Danger Zone → Sheet neu aufbauen) löst keine Benachrichtigungen aus
 
 ## Rollen
 
