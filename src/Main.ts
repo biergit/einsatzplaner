@@ -33,6 +33,8 @@ function menuSheetNeuAufbauen(): void {
     buildAllSheets(SHEET_CONFIG);
     SpreadsheetApp.getActiveSpreadsheet().rename(SHEET_CONFIG.einstellungen.sheetTitel);
     saveSheetSnapshots(SpreadsheetApp.getActiveSpreadsheet());
+    cleanupTriggers();
+    ensureOnEditTrigger();
     props.setProperty('SHEET_BUILDER_RUNNING', 'false');
     ui.alert('Fertig', 'Das Sheet wurde erfolgreich neu aufgebaut.', ui.ButtonSet.OK);
   } catch (e) {
@@ -112,4 +114,6 @@ function menuFinalisierenUndSenden(): void {
 
 function autorisiere(): void {
   ScriptApp.getProjectTriggers();
+  cleanupTriggers();
+  ensureOnEditTrigger();
 }

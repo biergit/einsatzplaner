@@ -546,6 +546,32 @@ function resetDebounceTimer(): void {
   }
 }
 
+/** Stellt sicher, dass ein installierbarer onEdit-Trigger existiert.
+ * Ohne diesen läuft onEdit nur als Simple-Trigger und bricht wegen
+ * authMode !== FULL sofort ab. */
+function ensureOnEditTrigger(): void {
+  for (const t of ScriptApp.getProjectTriggers()) {
+    if (t.getHandlerFunction() === 'onEdit') return;
+  }
+  ScriptApp.newTrigger('onEdit')
+    .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
+    .onEdit()
+    .create();
+  Logger.log('ensureOnEditTrigger: Installierbaren onEdit-Trigger erstellt');
+}
+
+/** Entfernt alte Trigger aus früheren Script-Versionen (z.B. anwesenheitGeaendert).
+ * Behält nur onEdit und onDebounceTimer. */
+function cleanupTriggers(): void {
+  for (const t of ScriptApp.getProjectTriggers()) {
+    const fn = t.getHandlerFunction();
+    if (fn !== 'onEdit' && fn !== 'onDebounceTimer') {
+      Logger.log(`cleanupTriggers: Lösche alten Trigger "${fn}"`);
+      ScriptApp.deleteTrigger(t);
+    }
+  }
+}
+
 /** Wird vom Debounce-Timer aufgerufen. Löscht den Timer und leert den Pending-Puffer. */
 function onDebounceTimer(): void {
   Logger.log('onDebounceTimer: Timer ausgelöst');
