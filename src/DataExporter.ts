@@ -151,8 +151,6 @@ function buildEinstellungenSection(s: ReturnType<typeof emailStyles>): string {
 // ─── Helper ────────────────────────────────────────────────────────────────
 
 function formatDate(val: unknown): string {
-  if (val instanceof Date) {
-    return Utilities.formatDate(val, 'Europe/Berlin', 'dd.MM.yyyy');
-  }
-  return '';
+  const d = toDate(val);
+  return d ? Utilities.formatDate(d, 'Europe/Berlin', 'dd.MM.yyyy') : '';
 }

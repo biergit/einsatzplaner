@@ -7,13 +7,55 @@ function onOpen(): void {
     .addSeparator()
     .addItem('Finalisieren + Emails senden', 'menuFinalisierenUndSenden')
     .addSeparator()
+    .addItem('Spieltag-Filter setzen', 'menuSpieltagFilterSetzen')
+    .addItem('Spieltag-Filter entfernen', 'menuSpieltagFilterEntfernen')
+    .addSeparator()
     .addItem('Daten exportieren', 'menuDatenExportieren')
+    .addSeparator()
+    .addItem('Autorisierung prüfen', 'menuAutorisierungPruefen')
     .addSeparator()
     .addSubMenu(ui.createMenu('Danger Zone')
       .addItem('Sheet neu aufbauen', 'menuSheetNeuAufbauen'))
     .addToUi();
 
   saveSheetSnapshots(SpreadsheetApp.getActiveSpreadsheet());
+}
+
+function menuSpieltagFilterSetzen(): void {
+  const ui = SpreadsheetApp.getUi();
+  const saisonSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAMES.SAISON);
+  if (!saisonSheet) {
+    ui.alert('Fehler', 'Saison-Sheet nicht gefunden.', ui.ButtonSet.OK);
+    return;
+  }
+  applySpieltagFilter(saisonSheet, SHEET_CONFIG);
+  ui.alert('Fertig', 'Der Spieltag-Filter wurde gesetzt. Es werden nur noch Spieltage angezeigt.', ui.ButtonSet.OK);
+}
+
+function menuSpieltagFilterEntfernen(): void {
+  const ui = SpreadsheetApp.getUi();
+  const saisonSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAMES.SAISON);
+  if (!saisonSheet) {
+    ui.alert('Fehler', 'Saison-Sheet nicht gefunden.', ui.ButtonSet.OK);
+    return;
+  }
+  removeSpieltagFilter(saisonSheet);
+  ui.alert('Fertig', 'Der Spieltag-Filter wurde entfernt. Alle Tage sind wieder sichtbar.', ui.ButtonSet.OK);
+}
+
+function menuAutorisierungPruefen(): void {
+  const ui = SpreadsheetApp.getUi();
+  try {
+    const email = Session.getActiveUser().getEmail();
+    autorisiere();
+    ui.alert(
+      'Autorisierung OK',
+      `Angemeldet als: ${email || 'Unbekannt'}\n\nDer installierbare onEdit-Trigger ist eingerichtet.\n\nHinweis: Die "Sicherheitswarnung" beim ersten Klick nach einem Deployment ist die normale Google-Autorisierung – einmal bestätigen, danach läuft alles ohne weitere Nachfrage.`,
+      ui.ButtonSet.OK
+    );
+  } catch (e) {
+    ui.alert('Fehler', `Autorisierung fehlgeschlagen:\n${e}`, ui.ButtonSet.OK);
+  }
 }
 
 function menuSheetNeuAufbauen(): void {

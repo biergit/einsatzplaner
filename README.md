@@ -62,6 +62,8 @@ Nach dem ersten Deploy öffnest du das Sheet und der Code ist da, aber das Menü
 
 Danach erscheint das Menü **Einsatzplaner** und alle Funktionen stehen bereit. Dieser Schritt ist nur einmal nötig – bei späteren `clasp push`-Deployments ist nichts weiter zu tun.
 
+> **Hinweis:** Erscheint beim Klick auf einen Menüpunkt eine „Sicherheitswarnung" (z. B. nach einem Deployment), ist das die normale Google-Autorisierung für das (noch unveröffentlichte) Script – einmal bestätigen, danach läuft alles ohne weitere Nachfrage. Alternativ gibt es im Menü den Punkt **Einsatzplaner → Autorisierung prüfen**.
+
 ## Entwicklung
 
 ```
@@ -106,8 +108,10 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 |-----------|-------------|
 | Sheet neu aufbauen | Löscht alle Sheets und baut sie aus der Konfiguration neu auf. Löst **keine** E-Mail-Benachrichtigungen aus. |
 | Daten exportieren | Exportiert alle Rohdaten als TSV/JSON per E-Mail-Anhang |
-| Aufstellungen generieren | Füllt leere Aufstellungs-Zellen basierend auf Rang + Verfügbarkeit |
+| Aufstellungen generieren | Füllt leere Aufstellungs-Zellen basierend auf Rang + Verfügbarkeit. Erneuert auch die Gelb-Markierung (Rang > 4) aus den aktuellen Rängen. |
+| Spieltag-Filter setzen / entfernen | Blendet im Saison-Sheet alle Tage aus, die keine Spieltage sind (bzw. wieder ein) |
 | Finalisieren + Emails senden | Setzt Geplant→Final und versendet Einsatz-Mails |
+| Autorisierung prüfen | Prüft Google-Berechtigungen, legt den onEdit-Trigger an und zeigt den angemeldeten Benutzer |
 
 ## Automatische Benachrichtigungen
 

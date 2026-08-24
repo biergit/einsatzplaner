@@ -10,6 +10,10 @@ const SHEET_NAMES = {
 
 const HEADER_COLOR = '#4A90D9';
 const HEADER_FONT_COLOR = '#FFFFFF';
+const STATUS_FINAL_COLOR = '#D9EAD3';
+const STATUS_GEPLANT_COLOR = '#FCE5CD';
+const ERSATZ_COLOR = '#FFF7E0';
+const ABWESEN_COLOR = '#F4CCCC';
 
 function getOrCreateSheet(name: string): GoogleAppsScript.Spreadsheet.Sheet {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -47,7 +51,7 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['SAISON-SPALTEN', '', ''],
     ['Datum', 'Vorausgefüllt', ''],
     ['Wochentag', 'Automatisch (Mo–So)', ''],
-    ['Gegner', 'Vom Kapitän – macht Tag zum Spieltag', `Filter zeigt nur Spieltage (${wt}). Filter deaktivieren: Daten → Filter deaktivieren`],
+    ['Gegner', 'Vom Kapitän – macht Tag zum Spieltag', `Filter zeigt nur Spieltage (${wt}). Menü: Einsatzplaner → Spieltag-Filter setzen/entfernen`],
     ['Startzeit', 'Optional, z.B. 19:30', ''],
     ['Heim / Auswärts', 'Dropdown', ''],
     ['Pro Spieler', `Dropdown: ${ALLE_AUFSTELLUNGS_TYPEN.join(', ')}. ✗ = abwesend`, ''],
@@ -60,8 +64,10 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['MENÜ', '', ''],
     ['Danger Zone → Sheet neu aufbauen', 'Alles löschen und neu bauen', 'Keine E-Mails'],
     ['Daten exportieren', 'Exportiert alle Rohdaten als TSV/JSON per E-Mail', ''],
-    ['Aufstellungen generieren', 'Leere Zellen nach Rang + Verfügbarkeit füllen', 'Nicht-Stammspieler (gelb) = Rang > 4 oder Ersatzspieler'],
+    ['Aufstellungen generieren', 'Leere Zellen nach Rang + Verfügbarkeit füllen', 'Nicht-Stammspieler (gelb) = Rang > 4 oder Ersatzspieler. Gelbe Markierung wird aus den aktuellen Rängen erneuert.'],
+    ['Spieltag-Filter setzen / entfernen', 'Blendet Nicht-Spieltage im Saison-Sheet aus / ein', ''],
     ['Finalisieren + Emails senden', 'Geplant→Final, HTML-Mails an Spieler + Gesamtspielplan', ''],
+    ['Autorisierung prüfen', 'Prüft Google-Berechtigungen und legt den onEdit-Trigger an', 'Die "Sicherheitswarnung" beim ersten Klick nach einem Deployment ist die normale Google-Autorisierung – einmal bestätigen.'],
     ['', '', ''],
     ['BENACHRICHTIGUNGEN', '', ''],
     ['Änderungs-Mail', `Nach ${einstellungen.debounceMinuten} Min. an Kapitän (immer) + Checkbox-Inhaber`, 'Nur bei Saison-Änderungen (Aufstellung, Gegner, Startzeit, Status) und Abwesenheiten mit Spieltags-Bezug. Neue, nur geplante Spieltage lösen keine Mail aus.'],
@@ -117,8 +123,8 @@ function buildAbwesenheitenSheet(config: SheetConfig): GoogleAppsScript.Spreadsh
     sheet.getRange(2, 1, config.abwesenheiten.length, numCols).setValues(
       config.abwesenheiten.map(a => [
         a.spieler,
-        `${pad2(a.von.getDate())}.${pad2(a.von.getMonth() + 1)}.${a.von.getFullYear()}`,
-        `${pad2(a.bis.getDate())}.${pad2(a.bis.getMonth() + 1)}.${a.bis.getFullYear()}`,
+        new Date(a.von),
+        new Date(a.bis),
         a.kommentar,
         '',
       ])
@@ -201,51 +207,78 @@ function buildSaisonSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.She
   sheet.getRange(2, saisonStatusCol(), lastRow - 1, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInList(['Geplant', 'Final']).setAllowInvalid(true).build());
 
+  sheet.setConditionalFormatRules(buildSaisonConditionalFormats(sheet, lastRow, config.spieler));
+
+  applySpieltagFilter(sheet, config);
+
+  sheet.setFrozenRows(1);
+  sheet.setFrozenColumns(saisonHeimAuswaertsCol());
+  return sheet;
+}
+
+/**
+ * Erzeugt die bedingten Formatierungen des Saison-Sheets:
+ * Status-Farben, gelb für Ersatzspieler und Rang > 4, rot für ✗-Abwesenheiten.
+ * Die ✗-Regel steht zuletzt (höchste visuelle Priorität).
+ */
+function buildSaisonConditionalFormats(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  lastRow: number,
+  spieler: Array<{ name: string; rang: number }>
+): GoogleAppsScript.Spreadsheet.ConditionalFormatRule[] {
   const cfRules: GoogleAppsScript.Spreadsheet.ConditionalFormatRule[] = [];
   const firstPlayerCol = saisonSpielerCol(0);
 
-  // Status: Grün = Final, Orange = Geplant
   const statusRange = sheet.getRange(2, saisonStatusCol(), lastRow - 1, 1);
   cfRules.push(
-    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Final').setBackground('#D9EAD3').setRanges([statusRange]).build(),
-    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Geplant').setBackground('#FCE5CD').setRanges([statusRange]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Final').setBackground(STATUS_FINAL_COLOR).setRanges([statusRange]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Geplant').setBackground(STATUS_GEPLANT_COLOR).setRanges([statusRange]).build(),
   );
 
   // Ersatzspieler-Spalten: gelb nur wenn Zelle gefüllt ist
   cfRules.push(
     SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied(`=${colLetter(saisonErsatzCol(0))}2<>""`)
-      .setBackground('#FFF7E0')
+      .setBackground(ERSATZ_COLOR)
       .setRanges([sheet.getRange(2, saisonErsatzCol(0), lastRow - 1, 3)])
       .build(),
   );
 
   // Rang > 4 Spieler-Spalten: gelb wenn Aufstellung eingetragen
-  for (let i = 0; i < config.spieler.length; i++) {
-    if (config.spieler[i].rang > 4) {
+  for (let i = 0; i < spieler.length; i++) {
+    if (spieler[i].rang > 4) {
       const col = saisonSpielerCol(i);
       cfRules.push(
         SpreadsheetApp.newConditionalFormatRule()
           .whenFormulaSatisfied(`=${colLetter(col)}2<>""`)
-          .setBackground('#FFF7E0')
+          .setBackground(ERSATZ_COLOR)
           .setRanges([sheet.getRange(2, col, lastRow - 1, 1)])
           .build(),
       );
     }
   }
 
-  // ✗-Zellen in allen Spieler-Spalten rot hinterlegen (letzte Regel → höchste visuelle Priorität)
+  // ✗-Zellen in allen Spieler-Spalten rot hinterlegen
   cfRules.push(
-    SpreadsheetApp.newConditionalFormatRule().whenTextStartsWith('✗').setBackground('#F4CCCC')
+    SpreadsheetApp.newConditionalFormatRule().whenTextStartsWith('✗').setBackground(ABWESEN_COLOR)
       .setRanges([sheet.getRange(2, firstPlayerCol, lastRow - 1,
-        saisonSpielerCol(config.spieler.length - 1) - firstPlayerCol + 1)]).build(),
+        saisonSpielerCol(spieler.length - 1) - firstPlayerCol + 1)]).build(),
   );
 
-  sheet.setConditionalFormatRules(cfRules);
+  return cfRules;
+}
 
-  const filterRange = sheet.getRange(1, 1, lastRow, numCols);
-  if (filterRange.getFilter()) filterRange.getFilter()!.remove();
+/**
+ * Setzt den Spieltag-Filter auf dem Saison-Sheet: Alle Wochentage ohne
+ * Spieltag (laut einstellungen.spieltage) werden ausgeblendet.
+ * Ein vorhandener Filter wird vorher entfernt.
+ */
+function applySpieltagFilter(sheet: GoogleAppsScript.Spreadsheet.Sheet, config: SheetConfig): void {
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  const existing = sheet.getFilter();
+  if (existing) existing.remove();
 
+  const filterRange = sheet.getRange(1, 1, lastRow, saisonColCount());
   const filter = filterRange.createFilter();
   const spieltagNames = config.einstellungen.spieltage.map(d => TAGESNAMEN[d]);
   filter.setColumnFilterCriteria(saisonWochentagCol(),
@@ -253,10 +286,12 @@ function buildSaisonSheet(config: SheetConfig): GoogleAppsScript.Spreadsheet.She
       .setHiddenValues(TAGESNAMEN.filter(t => !spieltagNames.includes(t)))
       .build()
   );
+}
 
-  sheet.setFrozenRows(1);
-  sheet.setFrozenColumns(saisonHeimAuswaertsCol());
-  return sheet;
+/** Entfernt einen eventuell vorhandenen Filter vom Saison-Sheet. */
+function removeSpieltagFilter(sheet: GoogleAppsScript.Spreadsheet.Sheet): void {
+  const existing = sheet.getFilter();
+  if (existing) existing.remove();
 }
 
 function buildAenderungslogSheet(): GoogleAppsScript.Spreadsheet.Sheet {

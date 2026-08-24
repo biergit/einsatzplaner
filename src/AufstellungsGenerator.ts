@@ -27,6 +27,24 @@ function generateAufstellungen(): void {
   fillPlayerPresenceFast(saisonSheet, dates, allSpieler.map(s => s.name), allAbw);
   fillEinsatzartenFast(saisonSheet, dates, allSpieler, allAbw);
   validateAllRowsFast(saisonSheet, dates, allSpieler, allAbw);
+  refreshSaisonFormatting(saisonSheet, allSpieler);
+}
+
+/**
+ * Erneuert die bedingten Formatierungen des Saison-Sheets aus den aktuellen
+ * Rängen des Spieler-Sheets (nicht aus der Build-Config), damit die
+ * Gelb-Markierung (Rang > 4) nach Rang-Änderungen korrekt bleibt.
+ */
+function refreshSaisonFormatting(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  allSpieler: Spieler[]
+): void {
+  const rangNachName = new Map(allSpieler.map(s => [s.name, s.rang]));
+  const spielerMitRang = SHEET_CONFIG.spieler.map(s => ({
+    name: s.name,
+    rang: rangNachName.get(s.name) ?? s.rang,
+  }));
+  sheet.setConditionalFormatRules(buildSaisonConditionalFormats(sheet, sheet.getLastRow(), spielerMitRang));
 }
 
 function buildAbwesenheitenIndex(
@@ -205,9 +223,15 @@ function validateAllRowsFast(
 }
 
 function toDate(val: unknown): Date | null {
-  if (val instanceof Date) return val;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
   if (typeof val === 'string' && val) {
-    const d = new Date(val);
+    const trimmed = val.trim();
+    const german = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(trimmed);
+    if (german) {
+      const d = new Date(Number(german[3]), Number(german[2]) - 1, Number(german[1]));
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(trimmed);
     return isNaN(d.getTime()) ? null : d;
   }
   return null;
