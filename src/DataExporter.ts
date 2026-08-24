@@ -114,9 +114,11 @@ function buildAbwesenheitenSection(ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
 // ─── Saison ────────────────────────────────────────────────────────────────
 
 function buildSaisonSection(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, s: ReturnType<typeof emailStyles>): string {
-  const playerNames = SHEET_CONFIG.spieler.map(p => p.name);
-  const headers = ['Datum', 'Wochentag', 'Gegner', 'Startzeit', 'Heim/Auswärts', ...playerNames, 'Ersatz 1', 'Ersatz 2', 'Ersatz 3', 'Status', 'Kommentar'];
   const sheet = ss.getSheetByName(SHEET_NAMES.SAISON);
+  const playerNames = sheet && sheet.getLastRow() >= 1
+    ? sheet.getRange(1, saisonSpielerCol(0), 1, SHEET_CONFIG.spieler.length).getValues()[0].map(v => String(v || '').trim())
+    : SHEET_CONFIG.spieler.map(p => p.name);
+  const headers = ['Datum', 'Wochentag', 'Gegner', 'Startzeit', 'Heim/Auswärts', ...playerNames, 'Ersatz 1', 'Ersatz 2', 'Ersatz 3', 'Status', 'Kommentar'];
   const rows: string[][] = [];
   if (sheet) {
     const lr = sheet.getLastRow();

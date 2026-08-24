@@ -101,8 +101,9 @@ function menuDatenExportieren(): void {
 
 function menuAufstellungenGenerieren(): void {
   try {
-    generateAufstellungen();
-    SpreadsheetApp.getUi().alert('Fertig', 'Die Aufstellungen wurden generiert.', SpreadsheetApp.getUi().ButtonSet.OK);
+    const warnings = generateAufstellungen();
+    const zusatz = warnings.length > 0 ? `\n\nHinweise:\n- ${warnings.join('\n- ')}` : '';
+    SpreadsheetApp.getUi().alert('Fertig', `Die Aufstellungen wurden generiert.${zusatz}`, SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (e) {
     SpreadsheetApp.getUi().alert('Fehler', `Beim Generieren ist ein Fehler aufgetreten:\n${e}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }

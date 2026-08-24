@@ -99,7 +99,7 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 | **Dokumentation** | Erläuterung aller Spalten, Funktionen und des Workflows |
 | **Spieler** | Name, Email (optional), Rang, Aufstellungsänderungen melden, Rolle |
 | **Abwesenheiten** | Spieler, Von, Bis, Kommentar |
-| **Saison** | Zentrale Übersicht: jeder Tag eine Zeile, Spieltage mit Gegner/Aufstellung. Abwesende Spieler (✗) sind rot hinterlegt. |
+| **Saison** | Zentrale Übersicht: jeder Tag eine Zeile, Spieltage mit Gegner/Aufstellung. Abwesende Spieler (✗) sind rot hinterlegt. Die Spieler-Spalten folgen Namen und Reihenfolge des Spieler-Sheets (Sync bei „Aufstellungen generieren"). |
 | **Änderungslog** | Automatisches Protokoll aller Änderungen (versteckt) |
 
 ## Menü-Funktionen
@@ -108,7 +108,7 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 |-----------|-------------|
 | Sheet neu aufbauen | Löscht alle Sheets und baut sie aus der Konfiguration neu auf. Löst **keine** E-Mail-Benachrichtigungen aus. |
 | Daten exportieren | Exportiert alle Rohdaten als TSV/JSON per E-Mail-Anhang |
-| Aufstellungen generieren | Füllt leere Aufstellungs-Zellen basierend auf Rang + Verfügbarkeit. Erneuert auch die Gelb-Markierung (Rang > 4) aus den aktuellen Rängen. |
+| Aufstellungen generieren | Füllt leere Aufstellungs-Zellen basierend auf Rang + Verfügbarkeit. Erneuert die Gelb-Markierung (Rang > 4) aus den aktuellen Rängen und synchronisiert die Saison-Spaltennamen mit dem Spieler-Sheet. |
 | Spieltag-Filter setzen / entfernen | Blendet im Saison-Sheet alle Tage aus, die keine Spieltage sind (bzw. wieder ein) |
 | Finalisieren + Emails senden | Setzt Geplant→Final und versendet Einsatz-Mails |
 | Autorisierung prüfen | Prüft Google-Berechtigungen, legt den onEdit-Trigger an und zeigt den angemeldeten Benutzer |

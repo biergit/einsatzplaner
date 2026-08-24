@@ -1,12 +1,6 @@
 /// <reference path="ConfigTypes.ts" />
 
-function buildNameToColIndex(): Map<string, number> {
-  const m = new Map<string, number>();
-  SHEET_CONFIG.spieler.forEach((s, i) => m.set(s.name, i));
-  return m;
-}
-
-function generateAufstellungen(): void {
+function generateAufstellungen(): string[] {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const spielerSheet = ss.getSheetByName(SHEET_NAMES.SPIELER);
   const abwesenheitenSheet = ss.getSheetByName(SHEET_NAMES.ABWESENHEITEN);
@@ -14,12 +8,20 @@ function generateAufstellungen(): void {
 
   if (!spielerSheet || !abwesenheitenSheet || !saisonSheet) {
     SpreadsheetApp.getUi().alert('Fehler', 'Nicht alle Sheets vorhanden.', SpreadsheetApp.getUi().ButtonSet.OK);
-    return;
+    return [];
   }
 
   const allSpieler = readSpieler(spielerSheet);
   const lastRow = saisonSheet.getLastRow();
-  if (lastRow <= 1) return;
+  if (lastRow <= 1) return [];
+
+  const warnings: string[] = [];
+  if (allSpieler.length > SHEET_CONFIG.spieler.length) {
+    const extra = allSpieler.slice(SHEET_CONFIG.spieler.length).map(s => s.name).join(', ');
+    warnings.push(`Keine Saison-Spalte für: ${extra}. Bitte die Konfiguration (data/spieler.tsv) erweitern und das Sheet neu aufbauen.`);
+  }
+
+  syncSaisonSheet(saisonSheet, abwesenheitenSheet, allSpieler);
 
   const allAbw = buildAbwesenheitenIndex(abwesenheitenSheet);
   const dates = readSaisonDates(saisonSheet, lastRow);
@@ -28,6 +30,57 @@ function generateAufstellungen(): void {
   fillEinsatzartenFast(saisonSheet, dates, allSpieler, allAbw);
   validateAllRowsFast(saisonSheet, dates, allSpieler, allAbw);
   refreshSaisonFormatting(saisonSheet, allSpieler);
+  return warnings;
+}
+
+/**
+ * Gleicht das Saison-Sheet mit den aktuellen Spielern des Spieler-Sheets ab.
+ * Die Saison-Spalten folgen positionsbasiert der Reihenfolge des Spieler-Sheets:
+ * - Spaltenüberschriften werden auf die aktuellen Namen gesetzt
+ * - Abwesenheitszeilen mit alten (Config-)Namen werden auf die neuen Namen umgeschrieben
+ */
+function syncSaisonSheet(
+  saisonSheet: GoogleAppsScript.Spreadsheet.Sheet,
+  abwesenheitenSheet: GoogleAppsScript.Spreadsheet.Sheet,
+  allSpieler: Spieler[]
+): void {
+  const playerCount = Math.min(allSpieler.length, SHEET_CONFIG.spieler.length);
+  const currentNames = allSpieler.slice(0, playerCount).map(s => s.name);
+  saisonSheet.getRange(1, saisonSpielerCol(0), 1, playerCount).setValues([currentNames]);
+  renameAbwesenheitenSpieler(abwesenheitenSheet, currentNames);
+}
+
+/**
+ * Schreibt Abwesenheitszeilen mit veralteten Spielernamen auf die aktuellen
+ * Namen um. Zuordnung positional: Config-Position i → aktuelle Position i.
+ * Einmaliger In-Memory-Durchlauf (keine Kaskaden-Umbenennungen).
+ */
+function renameAbwesenheitenSpieler(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  currentNames: string[]
+): void {
+  const oldToNew = new Map<string, string>();
+  for (let i = 0; i < currentNames.length; i++) {
+    const old = SHEET_CONFIG.spieler[i].name;
+    const neu = currentNames[i];
+    if (old !== neu) oldToNew.set(old, neu);
+  }
+  if (oldToNew.size === 0) return;
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+
+  const range = sheet.getRange(2, COL_ABWESENHEITEN.Spieler, lastRow - 1, 1);
+  const values = range.getValues();
+  let changed = false;
+  for (const row of values) {
+    const neu = oldToNew.get(String(row[0] || '').trim());
+    if (neu) {
+      row[0] = neu;
+      changed = true;
+    }
+  }
+  if (changed) range.setValues(values);
 }
 
 /**
@@ -39,10 +92,9 @@ function refreshSaisonFormatting(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
   allSpieler: Spieler[]
 ): void {
-  const rangNachName = new Map(allSpieler.map(s => [s.name, s.rang]));
-  const spielerMitRang = SHEET_CONFIG.spieler.map(s => ({
+  const spielerMitRang = allSpieler.slice(0, SHEET_CONFIG.spieler.length).map(s => ({
     name: s.name,
-    rang: rangNachName.get(s.name) ?? s.rang,
+    rang: s.rang,
   }));
   sheet.setConditionalFormatRules(buildSaisonConditionalFormats(sheet, sheet.getLastRow(), spielerMitRang));
 }
@@ -104,15 +156,11 @@ function fillPlayerPresenceFast(
   allAbw: Map<string, Map<string, string>>
 ): void {
   const numRows = dates.length;
+  const playerCount = Math.min(playerNames.length, SHEET_CONFIG.spieler.length);
 
-  const nameToColIndex = buildNameToColIndex();
-
-  for (const name of playerNames) {
-    const colIndex = nameToColIndex.get(name);
-    if (colIndex === undefined) continue;
-
-    const col = saisonSpielerCol(colIndex);
-    const range = sheet.getRange(2, col, numRows, 1);
+  for (let pi = 0; pi < playerCount; pi++) {
+    const name = playerNames[pi];
+    const range = sheet.getRange(2, saisonSpielerCol(pi), numRows, 1);
     const values = range.getValues() as string[][];
     let changed = false;
 
@@ -144,8 +192,7 @@ function fillEinsatzartenFast(
   allAbw: Map<string, Map<string, string>>
 ): void {
   const numRows = dates.length;
-
-  const nameToColIndex = buildNameToColIndex();
+  const playerCount = Math.min(allSpieler.length, SHEET_CONFIG.spieler.length);
 
   for (let r = 0; r < numRows; r++) {
     const row = r + 2;
@@ -169,12 +216,9 @@ function fillEinsatzartenFast(
 
     const top4Names = new Set(available.slice(0, 4).map(s => s.name));
 
-    for (const spieler of allSpieler) {
-      const colIndex = nameToColIndex.get(spieler.name);
-      if (colIndex === undefined) continue;
-
-      const col = saisonSpielerCol(colIndex);
-      const cell = sheet.getRange(row, col);
+    for (let pi = 0; pi < playerCount; pi++) {
+      const spieler = allSpieler[pi];
+      const cell = sheet.getRange(row, saisonSpielerCol(pi));
       const current = String(cell.getValue() || '').trim();
       if (current && !current.startsWith('✗')) continue;
 
@@ -200,9 +244,13 @@ function validateAllRowsFast(
 
   const validierungValues: string[][] = [];
 
-  const spielerList: Spieler[] = SHEET_CONFIG.spieler.map(s => ({
-    name: s.name, email: '', rang: s.rang, aenderungenMelden: false, rolle: ''
-  }));
+  const spielerList: Spieler[] = [];
+  for (let i = 0; i < configPlayerCount; i++) {
+    const s = allSpieler[i];
+    spielerList.push(s
+      ? { name: s.name, email: '', rang: s.rang, aenderungenMelden: false, rolle: '' }
+      : { name: SHEET_CONFIG.spieler[i].name, email: '', rang: SHEET_CONFIG.spieler[i].rang, aenderungenMelden: false, rolle: '' });
+  }
 
   for (let r = 0; r < numRows; r++) {
     const gegner = String(gegnerData[r][0] || '').trim();
