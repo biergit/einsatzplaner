@@ -19,7 +19,7 @@ describe('build pipeline', () => {
 
   it('compiles all TypeScript source files', () => {
     const files = ['AufstellungsGenerator.js', 'ChangeTracker.js', 'Config.js', 'ConfigTypes.js',
-      'DataExporter.js', 'EmailService.js', 'Main.js', 'SheetBuilder.js'];
+      'DataExporter.js', 'EmailService.js', 'MailJobs.js', 'Main.js', 'SheetBuilder.js'];
     for (const f of files) {
       expect(existsSync(resolve(ROOT, 'dist', f))).toBe(true);
     }

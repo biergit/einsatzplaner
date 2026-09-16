@@ -107,11 +107,22 @@ build.py       Liest data/ oder test-data/ → generiert dist/Config.js
 | Menüpunkt | Beschreibung |
 |-----------|-------------|
 | Sheet neu aufbauen | Löscht alle Sheets und baut sie aus der Konfiguration neu auf. Löst **keine** E-Mail-Benachrichtigungen aus. |
-| Daten exportieren | Exportiert alle Rohdaten als TSV/JSON per E-Mail-Anhang |
+| Daten exportieren | Beauftragt den Export aller Rohdaten als TSV/JSON per E-Mail (Versand innerhalb einer Minute vom Host-Konto) |
 | Aufstellungen generieren | Füllt leere Aufstellungs-Zellen basierend auf Rang + Verfügbarkeit. Erneuert die Gelb-Markierung (Rang > 4) aus den aktuellen Rängen und synchronisiert die Saison-Spaltennamen mit dem Spieler-Sheet. |
 | Spieltag-Filter setzen / entfernen | Blendet im Saison-Sheet alle Tage aus, die keine Spieltage sind (bzw. wieder ein) |
-| Finalisieren + Emails senden | Setzt Geplant→Final und versendet Einsatz-Mails |
-| Autorisierung prüfen | Prüft Google-Berechtigungen, legt den onEdit-Trigger an und zeigt den angemeldeten Benutzer |
+| Finalisieren + Emails senden | Setzt Geplant→Final; die Einsatz-Mails werden innerhalb einer Minute vom Host-Konto versendet |
+| Mail-Versand einrichten | Einmalig vom Host auszuführen: richtet den Minutentakt-Versand ein (siehe „E-Mail-Absender") |
+| Autorisierung prüfen | Prüft Google-Berechtigungen, legt den onEdit-Trigger an und zeigt angemeldetes Konto + Mail-Versand-Status |
+
+## E-Mail-Absender
+
+Google Apps Script versendet Mails immer vom **ausführenden Konto**. Damit alle Mails einheitlich vom Host-Konto des Scripts kommen (bessere Zustellbarkeit, einheitlicher Absender), gilt:
+
+1. Der **Host** führt einmalig **Einsatzplaner → Mail-Versand einrichten** aus. Das legt einen Minutentakt-Trigger (`processMailJobs`) und den onEdit-Trigger unter seinem Konto neu an.
+2. Menü-Aktionen (Finalisieren, Export) legen die Mails nur noch in eine Warteschlange (`PENDING_MAIL_JOBS`); der Host-Trigger versendet sie innerhalb einer Minute.
+3. Änderungs-Mails laufen ohnehin über den Debounce-Timer und werden vom Trigger-Inhaber (Host) versendet.
+
+Alle Mails nutzen einen einheitlichen Anzeigenamen (`<TeamName> Einsatzplaner`) und `Reply-To` = Kapitän, damit Antworten beim Kapitän landen. Falls die Einrichtung fehlt, weisen Finalisieren/Export darauf hin.
 
 ## Automatische Benachrichtigungen
 

@@ -292,10 +292,14 @@ ${htmlTable}
 ${ohneHtml}
 ${emailFooter()}`;
 
+  const teamName = SHEET_CONFIG.einstellungen.teamName;
+  const kapitaen = getKapitaenEmail(SpreadsheetApp.getActiveSpreadsheet());
   MailApp.sendEmail({
     to: spieler.email,
-    subject: `Neuer ${SHEET_CONFIG.einstellungen.teamName} - Einsatzplan`,
+    subject: `${teamName} – Neuer Einsatzplan`,
     htmlBody: html,
+    name: `${teamName} Einsatzplaner`,
+    ...(kapitaen && { replyTo: kapitaen }),
     ...(logo && { inlineImages: logo.inlineImages }),
   });
 }

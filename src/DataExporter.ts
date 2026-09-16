@@ -1,13 +1,8 @@
 /// <reference path="ConfigTypes.ts" />
 
-function exportAllData(): void {
-  const userEmail = Session.getActiveUser().getEmail();
-  if (!userEmail || !userEmail.includes('@')) {
-    SpreadsheetApp.getUi().alert(
-      'Fehler',
-      'Export per E-Mail benötigt ein Google-Konto. Deine E-Mail-Adresse konnte nicht ermittelt werden.',
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
+function exportAllData(recipientEmail: string): void {
+  if (!recipientEmail || !recipientEmail.includes('@')) {
+    Logger.log('exportAllData: keine gültige Empfängeradresse — Abbruch');
     return;
   }
 
@@ -28,10 +23,13 @@ function exportAllData(): void {
 TSV-Block (für Copy & Paste in eine .tsv-Datei). Einstellungen liegen als JSON vor.</p>`;
   html += emailFooter();
 
+  const kapitaen = getKapitaenEmail(ss);
   MailApp.sendEmail({
-    to: userEmail,
-    subject: `Einsatzplaner – Datenexport ${timestamp}`,
+    to: recipientEmail,
+    subject: `${SHEET_CONFIG.einstellungen.teamName} – Datenexport ${timestamp}`,
     htmlBody: html,
+    name: `${SHEET_CONFIG.einstellungen.teamName} Einsatzplaner`,
+    ...(kapitaen && { replyTo: kapitaen }),
     ...(logo && { inlineImages: logo.inlineImages }),
   });
 }

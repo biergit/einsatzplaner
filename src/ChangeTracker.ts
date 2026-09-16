@@ -536,8 +536,8 @@ function addPendingEdit(entry: ChangeEntry): void {
 
 /**
  * Stellt sicher, dass ein onDebounceTimer-Trigger existiert.
- * Während Bulk-Operationen (SHEET_BUILDER_RUNNING oder BULK_EDIT) wird
- * kein Timer angelegt — der Aufrufer muss das selbst am Ende tun.
+ * Während eines Sheet-Neuaufbaus (SHEET_BUILDER_RUNNING) wird kein Timer
+ * angelegt — der Aufrufer muss das selbst am Ende tun.
  *
  * Falls die Trigger-Erstellung fehlschlägt (Quota, Berechtigungen), wird
  * ein DEBOUNCE_FAILED-Flag gesetzt. Der nächste onEdit-Aufruf erkennt das
@@ -546,7 +546,6 @@ function addPendingEdit(entry: ChangeEntry): void {
 function resetDebounceTimer(): void {
   const props = PropertiesService.getScriptProperties();
   if (props.getProperty('SHEET_BUILDER_RUNNING') === 'true') return;
-  if (props.getProperty('BULK_EDIT') === 'true') return;
 
   for (const t of ScriptApp.getProjectTriggers()) {
     if (t.getHandlerFunction() === 'onDebounceTimer') ScriptApp.deleteTrigger(t);
@@ -576,12 +575,21 @@ function ensureOnEditTrigger(): void {
   Logger.log('ensureOnEditTrigger: Installierbaren onEdit-Trigger erstellt');
 }
 
+/** Legt den installierbaren onEdit-Trigger neu an — unter dem aktuell
+ * ausführenden Konto. So kommen auch Änderungs-Mails vom gewünschten Absender. */
+function reinstallOnEditTrigger(): void {
+  for (const t of ScriptApp.getProjectTriggers()) {
+    if (t.getHandlerFunction() === 'onEdit') ScriptApp.deleteTrigger(t);
+  }
+  ensureOnEditTrigger();
+}
+
 /** Entfernt alte Trigger aus früheren Script-Versionen (z.B. anwesenheitGeaendert).
- * Behält nur onEdit und onDebounceTimer. */
+ * Behält onEdit, onDebounceTimer und den Mail-Poller. */
 function cleanupTriggers(): void {
   for (const t of ScriptApp.getProjectTriggers()) {
     const fn = t.getHandlerFunction();
-    if (fn !== 'onEdit' && fn !== 'onDebounceTimer') {
+    if (fn !== 'onEdit' && fn !== 'onDebounceTimer' && fn !== MAIL_POLLER_FUNCTION) {
       Logger.log(`cleanupTriggers: Lösche alten Trigger "${fn}"`);
       ScriptApp.deleteTrigger(t);
     }
@@ -1288,7 +1296,7 @@ function sendChangeNotification(
     return;
   }
 
-  const subject = `Einsatzplaner – Änderungen vom ${Utilities.formatDate(new Date(), 'Europe/Berlin', 'dd.MM.yyyy HH:mm')}`;
+  const subject = `${SHEET_CONFIG.einstellungen.teamName} – Änderungen vom ${Utilities.formatDate(new Date(), 'Europe/Berlin', 'dd.MM.yyyy HH:mm')}`;
   const s = emailStyles();
   const logo = getEmailLogo();
   let html = emailHeader() + (logo ? logo.html : '') + `
@@ -1370,6 +1378,8 @@ function sendChangeNotification(
       to: email,
       subject,
       htmlBody: body,
+      name: `${SHEET_CONFIG.einstellungen.teamName} Einsatzplaner`,
+      ...(kapEmail && { replyTo: kapEmail }),
       ...(logo && { inlineImages: logo.inlineImages }),
     });
   }

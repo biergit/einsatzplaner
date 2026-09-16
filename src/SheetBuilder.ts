@@ -63,13 +63,15 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
     ['', '', ''],
     ['MENÜ', '', ''],
     ['Danger Zone → Sheet neu aufbauen', 'Alles löschen und neu bauen', 'Keine E-Mails'],
-    ['Daten exportieren', 'Exportiert alle Rohdaten als TSV/JSON per E-Mail', ''],
+    ['Daten exportieren', 'Exportiert alle Rohdaten als TSV/JSON per E-Mail', 'Versand innerhalb einer Minute (Host-Konto)'],
     ['Aufstellungen generieren', 'Leere Zellen nach Rang + Verfügbarkeit füllen', 'Nicht-Stammspieler (gelb) = Rang > 4 oder Ersatzspieler. Gelbe Markierung wird aus den aktuellen Rängen erneuert. Saison-Spaltennamen werden mit dem Spieler-Sheet synchronisiert (Namen kürzen/ändern ist jederzeit möglich).'],
     ['Spieltag-Filter setzen / entfernen', 'Blendet Nicht-Spieltage im Saison-Sheet aus / ein', ''],
-    ['Finalisieren + Emails senden', 'Geplant→Final, HTML-Mails an Spieler + Gesamtspielplan', ''],
-    ['Autorisierung prüfen', 'Prüft Google-Berechtigungen und legt den onEdit-Trigger an', 'Die "Sicherheitswarnung" beim ersten Klick nach einem Deployment ist die normale Google-Autorisierung – einmal bestätigen.'],
+    ['Finalisieren + Emails senden', 'Geplant→Final, HTML-Mails an Spieler + Gesamtspielplan', 'Versand innerhalb einer Minute (Host-Konto)'],
+    ['Mail-Versand einrichten', 'Einmalig vom Host des Scripts ausführen', 'Richtet den Minutentakt-Versand ein. Danach kommen Änderungs-, Aufstellungs- und Export-Mails einheitlich vom Host-Konto.'],
+    ['Autorisierung prüfen', 'Prüft Google-Berechtigungen und legt den onEdit-Trigger an', 'Zeigt auch den Status des Mail-Versands. Die "Sicherheitswarnung" beim ersten Klick nach einem Deployment ist die normale Google-Autorisierung – einmal bestätigen.'],
     ['', '', ''],
     ['BENACHRICHTIGUNGEN', '', ''],
+    ['Absender', 'Host-Konto des Scripts', 'Alle Mails werden vom Konto des Script-Hosts versendet (Anzeigename: TeamName Einsatzplaner). Antworten gehen an den Kapitän (Reply-To).'],
     ['Änderungs-Mail', `Nach ${einstellungen.debounceMinuten} Min. an Kapitän (immer) + Checkbox-Inhaber`, 'Nur bei Saison-Änderungen (Aufstellung, Gegner, Startzeit, Status) und Abwesenheiten mit Spieltags-Bezug. Neue, nur geplante Spieltage lösen keine Mail aus.'],
     ['Aufstellungs-Mail', 'HTML mit persönlichem Plan + Gesamtspielplan', 'Ersatzspieler + Nicht-Stammspieler (Rang > 4) gelb hervorgehoben. Spieler ohne E-Mail siehe Änderungs-Mail.'],
     ['Ohne-Email-Hinweis', 'In der Änderungs-Mail (nur für Kapitän)', 'Tabelle mit Spieltag, Spieler, Einsatz (neu/geändert/entfernt) für Spieler ohne hinterlegte E-Mail-Adresse.'],
@@ -78,7 +80,7 @@ function buildDokumentationSheet(einstellungen: Einstellungen): GoogleAppsScript
   const numCols = 3;
   sheet.getRange(1, 1, rows.length, numCols).setValues(rows);
   sheet.getRange(1, 1, 2, numCols).setFontWeight('bold').setFontSize(14).setBackground('#E8F0FE');
-  for (const r of [4, 10, 14, 26, 32]) {
+  for (const r of [4, 10, 14, 26, 35]) {
     sheet.getRange(r, 1, 1, numCols).setFontWeight('bold').setFontSize(11).setBackground(HEADER_COLOR).setFontColor(HEADER_FONT_COLOR);
   }
   sheet.setFrozenRows(0);

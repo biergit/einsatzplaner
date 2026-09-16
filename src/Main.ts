@@ -12,6 +12,7 @@ function onOpen(): void {
     .addSeparator()
     .addItem('Daten exportieren', 'menuDatenExportieren')
     .addSeparator()
+    .addItem('Mail-Versand einrichten', 'menuMailVersandEinrichten')
     .addItem('Autorisierung prüfen', 'menuAutorisierungPruefen')
     .addSeparator()
     .addSubMenu(ui.createMenu('Danger Zone')
@@ -43,14 +44,32 @@ function menuSpieltagFilterEntfernen(): void {
   ui.alert('Fertig', 'Der Spieltag-Filter wurde entfernt. Alle Tage sind wieder sichtbar.', ui.ButtonSet.OK);
 }
 
+function menuMailVersandEinrichten(): void {
+  const ui = SpreadsheetApp.getUi();
+  try {
+    const email = setupMailPoller();
+    ui.alert(
+      'Mail-Versand eingerichtet',
+      `Ab jetzt werden alle automatischen Mails von diesem Konto versendet:\n${email || 'Unbekannt'}\n\nDer Versand erfolgt im Minutentakt (Google-Apps-Script-Trigger).`,
+      ui.ButtonSet.OK
+    );
+  } catch (e) {
+    ui.alert('Fehler', `Einrichtung des Mail-Versands fehlgeschlagen:\n${e}`, ui.ButtonSet.OK);
+  }
+}
+
 function menuAutorisierungPruefen(): void {
   const ui = SpreadsheetApp.getUi();
   try {
     const email = Session.getActiveUser().getEmail();
     autorisiere();
+    const owner = getMailPollerOwner();
+    const mailStatus = isMailPollerActive()
+      ? `aktiv${owner ? ` (Absender: ${owner})` : ''}`
+      : 'NICHT eingerichtet — bitte "Mail-Versand einrichten" ausführen';
     ui.alert(
       'Autorisierung OK',
-      `Angemeldet als: ${email || 'Unbekannt'}\n\nDer installierbare onEdit-Trigger ist eingerichtet.\n\nHinweis: Die "Sicherheitswarnung" beim ersten Klick nach einem Deployment ist die normale Google-Autorisierung – einmal bestätigen, danach läuft alles ohne weitere Nachfrage.`,
+      `Angemeldet als: ${email || 'Unbekannt'}\nMail-Versand: ${mailStatus}\n\nHinweis: Die "Sicherheitswarnung" beim ersten Klick nach einem Deployment ist die normale Google-Autorisierung – einmal bestätigen, danach läuft alles ohne weitere Nachfrage.`,
       ui.ButtonSet.OK
     );
   } catch (e) {
@@ -87,11 +106,22 @@ function menuSheetNeuAufbauen(): void {
 
 function menuDatenExportieren(): void {
   const ui = SpreadsheetApp.getUi();
+  if (!isMailPollerActive()) {
+    ui.alert('Mail-Versand nicht eingerichtet',
+      'Der automatische Mail-Versand ist noch nicht eingerichtet.\n\nBitte den Host des Scripts einmalig "Mail-Versand einrichten" ausführen lassen.',
+      ui.ButtonSet.OK);
+    return;
+  }
+  const email = Session.getActiveUser().getEmail();
+  if (!email || !email.includes('@')) {
+    ui.alert('Fehler', 'Export per E-Mail benötigt ein Google-Konto. Deine E-Mail-Adresse konnte nicht ermittelt werden.', ui.ButtonSet.OK);
+    return;
+  }
   try {
-    exportAllData();
+    enqueueMailJob('export');
     ui.alert(
-      'Export erfolgreich',
-      'Die Rohdaten wurden als E-Mail verschickt. Die Tabellen können per Copy & Paste direkt in Google Sheets oder eine .tsv-Datei eingefügt werden.',
+      'Export beauftragt',
+      'Die Rohdaten werden innerhalb einer Minute per E-Mail verschickt. Die Tabellen können per Copy & Paste direkt in Google Sheets oder eine .tsv-Datei eingefügt werden.',
       ui.ButtonSet.OK
     );
   } catch (e) {
@@ -111,6 +141,13 @@ function menuAufstellungenGenerieren(): void {
 
 function menuFinalisierenUndSenden(): void {
   const ui = SpreadsheetApp.getUi();
+  if (!isMailPollerActive()) {
+    ui.alert('Mail-Versand nicht eingerichtet',
+      'Der automatische Mail-Versand ist noch nicht eingerichtet.\n\nBitte den Host des Scripts einmalig "Mail-Versand einrichten" ausführen lassen.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
   const antwort = ui.alert(
     'Finalisieren + Emails senden',
     'Alle Aufstellungen mit Status "Geplant" werden auf "Final" gesetzt und Einsatz-Mails an die Spieler versendet.\n\nFortfahren?',
@@ -119,13 +156,11 @@ function menuFinalisierenUndSenden(): void {
   if (antwort !== ui.Button.YES) return;
 
   PropertiesService.getScriptProperties().setProperty('SUPPRESS_NOTIFICATION', 'true');
-  PropertiesService.getScriptProperties().setProperty('BULK_EDIT', 'true');
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const saisonSheet = ss.getSheetByName(SHEET_NAMES.SAISON);
   if (!saisonSheet) {
     PropertiesService.getScriptProperties().deleteProperty('SUPPRESS_NOTIFICATION');
-    PropertiesService.getScriptProperties().deleteProperty('BULK_EDIT');
     ui.alert('Fehler', 'Saison-Sheet nicht gefunden.', ui.ButtonSet.OK);
     return;
   }
@@ -143,16 +178,12 @@ function menuFinalisierenUndSenden(): void {
     }
   }
 
-  PropertiesService.getScriptProperties().deleteProperty('BULK_EDIT');
   PropertiesService.getScriptProperties().deleteProperty('SUPPRESS_NOTIFICATION');
-  resetDebounceTimer();
 
-  try {
-    sendEinsatzEmails();
-    ui.alert('Fertig', `${count} Spieltermine finalisiert. Einsatz-Mails wurden versendet.`, ui.ButtonSet.OK);
-  } catch (e) {
-    ui.alert('Fehler', `Finalisierung ok (${count} Termine), aber E-Mail-Versand fehlgeschlagen:\n${e}`, ui.ButtonSet.OK);
-  }
+  // Den Debounce-Timer legt der host-eigene onEdit-Trigger an (wie bei jeder
+  // Bearbeitung), damit auch die Änderungs-Mail vom Host-Konto kommt.
+  enqueueMailJob('einsatz');
+  ui.alert('Fertig', `${count} Spieltermine finalisiert. Die Einsatz-Mails werden innerhalb einer Minute versendet.`, ui.ButtonSet.OK);
 }
 
 function autorisiere(): void {
